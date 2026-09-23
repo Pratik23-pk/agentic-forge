@@ -1,0 +1,30 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      ARTIFACTS_DIR: /app/artifacts
+      GENERATED_PROJECTS_DIR: /app/generated-projects
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./generated-projects:/app/generated-projects
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

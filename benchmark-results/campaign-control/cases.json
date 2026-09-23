@@ -1,0 +1,122 @@
+[
+  {
+    "case_id": "game-original-platformer",
+    "category": "browser-game",
+    "capability_id": "react-vite",
+    "project_id": "skyline-sprint",
+    "prompt": "Build an original standalone React Vite TypeScript browser game: a side-scrolling rooftop platformer with keyboard and touch controls, deterministic scoring and level transitions, pause, restart, game-over and victory states, responsive canvas presentation, accessible instructions, and focused interaction tests. Use only original geometric artwork and no copyrighted characters or assets. No backend, database, authentication, deployment, or external API.",
+    "expected_paths": ["frontend/package.json", "frontend/src/App.tsx", "README.md"],
+    "expected_adapters": ["browser-game"],
+    "expected_workers": ["frontend"]
+  },
+  {
+    "case_id": "game-chess-arena",
+    "category": "browser-game",
+    "capability_id": "react-vite",
+    "project_id": "midnight-chess-arena",
+    "prompt": "Build an original standalone React Vite TypeScript browser game for local two-player chess with complete legal move validation, turn indication, check, checkmate, stalemate, captured pieces, move history, undo, reset, keyboard-accessible board controls, responsive presentation, and deterministic rule tests. No backend, database, authentication, deployment, or external API.",
+    "expected_paths": ["frontend/package.json", "frontend/src/App.tsx", "README.md"],
+    "expected_adapters": ["browser-game"],
+    "expected_workers": ["frontend"]
+  },
+  {
+    "case_id": "game-touch-puzzle",
+    "category": "browser-game",
+    "capability_id": "react-vite",
+    "project_id": "prism-circuit",
+    "prompt": "Build an original standalone React Vite TypeScript browser game: a touch-friendly circuit-routing puzzle with generated levels, deterministic win detection, score and move tracking, hints, pause, reset, game-over and completion states, responsive SVG or canvas rendering, keyboard accessibility, and focused interaction tests. No backend, database, authentication, deployment, or external API.",
+    "expected_paths": ["frontend/package.json", "frontend/src/App.tsx", "README.md"],
+    "expected_adapters": ["browser-game"],
+    "expected_workers": ["frontend"]
+  },
+  {
+    "case_id": "commerce-wallet-retail",
+    "category": "commerce",
+    "capability_id": "react-fastapi",
+    "project_id": "wallet-retail-insights",
+    "prompt": "Build a production-oriented React and FastAPI shopping cart application with sign in, customer and administrator roles, a default wallet balance, exact-money checkout, inventory conflict handling, idempotent purchase submission, transaction history, a Supabase PostgreSQL database, six deterministic seeded users, and an administrator-only analytics dashboard for spending and product performance. Include migrations, backend and frontend tests, loading, empty, forbidden, validation, and recovery states. Do not deploy or call a real payment provider.",
+    "expected_paths": ["frontend/package.json", "backend/pyproject.toml", "README.md"],
+    "expected_adapters": ["commerce", "analytics", "auth-rbac", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "commerce-subscription-saas",
+    "category": "commerce",
+    "capability_id": "react-fastapi",
+    "project_id": "subscription-operations",
+    "prompt": "Build a production-oriented React and FastAPI online store for SaaS subscriptions with sign in, subscriber and administrator roles, monthly and annual plans, exact-money invoices, a simulated idempotent checkout, upgrade and cancellation rules, subscription history, a Supabase PostgreSQL database, deterministic seed data, and an administrator-only analytics dashboard for recurring revenue, churn, and plan adoption. Include migrations and focused backend and frontend tests. Do not deploy or connect to a real payment provider.",
+    "expected_paths": ["frontend/package.json", "backend/pyproject.toml", "README.md"],
+    "expected_adapters": ["commerce", "analytics", "auth-rbac", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "commerce-multivendor-marketplace",
+    "category": "commerce",
+    "capability_id": "react-fastapi",
+    "project_id": "artisan-marketplace",
+    "prompt": "Build a production-oriented React and FastAPI multi-vendor marketplace with sign in, buyer, seller, and administrator roles, organization storefronts, exact-money carts and orders, seller-scoped inventory, idempotent checkout, order history, a Supabase PostgreSQL database, deterministic sample products and users, tenant isolation, and role-specific analytics dashboards. Include migrations, authorization tests, cross-tenant rejection tests, and responsive loading, empty, validation, and error states. Do not deploy or call a real payment provider.",
+    "expected_paths": ["frontend/package.json", "backend/pyproject.toml", "README.md"],
+    "expected_adapters": ["commerce", "analytics", "auth-rbac", "persistence", "multi-tenant"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "video-indie-library",
+    "category": "video",
+    "capability_id": "react-fastapi",
+    "project_id": "indie-screen-library",
+    "prompt": "Build a production-oriented React and FastAPI video platform with sign in, member and curator roles, a responsive independent-film catalog, accessible video playback, protected media upload with authorization, size and content-type validation, PostgreSQL persistence, deterministic seed data, loading, empty, playback, upload, and forbidden states, and focused frontend and backend tests. Use local sample media contracts rather than unreliable public video URLs. Do not deploy.",
+    "expected_paths": ["frontend/package.json", "backend/pyproject.toml", "README.md"],
+    "expected_adapters": ["video-platform", "auth-rbac", "file-upload", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "video-course-platform",
+    "category": "video",
+    "capability_id": "react-fastapi",
+    "project_id": "course-stream-academy",
+    "prompt": "Build a production-oriented React and FastAPI video platform for online courses with sign in, student, instructor, and administrator roles, course and lesson catalogs, accessible lesson playback, progress tracking, protected instructor media upload with size and content-type validation, PostgreSQL persistence, deterministic sample courses and users, and focused authorization, progress, loading, playback-error, and upload tests. Do not deploy or depend on public media URLs.",
+    "expected_paths": ["frontend/package.json", "backend/pyproject.toml", "README.md"],
+    "expected_adapters": ["video-platform", "auth-rbac", "file-upload", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "video-creator-hosting",
+    "category": "video",
+    "capability_id": "react-fastapi",
+    "project_id": "creator-video-studio",
+    "prompt": "Build a production-oriented React and FastAPI video hosting application with sign in, viewer, creator, and moderator roles, creator channels, searchable published and draft videos, accessible playback, protected resumable-style media upload states with authorization, bounded size and content-type validation, PostgreSQL persistence, deterministic seed data, and tests for permissions, range or streaming contracts, interrupted uploads, loading, empty, and playback failures. Do not deploy or use unreliable public media URLs.",
+    "expected_paths": ["frontend/package.json", "backend/pyproject.toml", "README.md"],
+    "expected_adapters": ["video-platform", "auth-rbac", "file-upload", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "realtime-team-scheduler",
+    "category": "realtime",
+    "capability_id": "react-node",
+    "project_id": "pulse-team-scheduler",
+    "prompt": "Build a production-oriented React and Node Express TypeScript live collaboration scheduling application with sign in, organization workspaces, PostgreSQL persistence, a shared calendar, WebSocket presence and updates, bounded reconnect, duplicate-event handling, tenant isolation, time-zone display, booking conflict prevention, cancellation states, and focused frontend and backend tests. Do not deploy.",
+    "expected_paths": ["frontend/package.json", "backend/package.json", "README.md"],
+    "expected_adapters": ["realtime", "auth-rbac", "multi-tenant", "persistence", "scheduling"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "realtime-kanban-workspaces",
+    "category": "realtime",
+    "capability_id": "react-node",
+    "project_id": "signal-kanban",
+    "prompt": "Build a production-oriented React and Node Express TypeScript live collaboration Kanban application with sign in, organization workspaces, member and administrator roles, PostgreSQL persistence, boards, columns and cards, WebSocket presence and ordered updates, optimistic UI with rollback, bounded reconnect, duplicate-event handling, tenant isolation, conflict-safe card moves, and focused frontend and backend tests. Do not deploy.",
+    "expected_paths": ["frontend/package.json", "backend/package.json", "README.md"],
+    "expected_adapters": ["realtime", "auth-rbac", "multi-tenant", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  },
+  {
+    "case_id": "realtime-support-inbox",
+    "category": "realtime",
+    "capability_id": "react-node",
+    "project_id": "relay-support-inbox",
+    "prompt": "Build a production-oriented React and Node Express TypeScript live collaboration support inbox with sign in, organization workspaces, customer, agent, and administrator roles, PostgreSQL persistence, conversations and assignments, WebSocket messages and presence, bounded reconnect, duplicate-message and ordering protection, tenant isolation, unread counts, assignment conflicts, loading, offline and error states, and focused authorization and realtime tests. Do not deploy.",
+    "expected_paths": ["frontend/package.json", "backend/package.json", "README.md"],
+    "expected_adapters": ["realtime", "auth-rbac", "multi-tenant", "persistence"],
+    "expected_workers": ["database", "backend", "frontend"]
+  }
+]

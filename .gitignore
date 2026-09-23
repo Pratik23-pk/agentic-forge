@@ -1,0 +1,46 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+coverage/
+dist/
+.vite/
+
+# Runtime output
+artifacts/*
+!artifacts/.gitkeep
+generated-projects/*
+!generated-projects/.gitkeep
+logs/
+*.log
+tmp/
+uploads/
+.agentic-forge/
+
+# Generated benchmark evidence (retain only the reusable campaign definition)
+benchmark-results/*
+!benchmark-results/campaign-control/
+benchmark-results/campaign-control/*
+!benchmark-results/campaign-control/README.md
+!benchmark-results/campaign-control/cases.json
+!benchmark-results/campaign-control/run_campaign.py
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

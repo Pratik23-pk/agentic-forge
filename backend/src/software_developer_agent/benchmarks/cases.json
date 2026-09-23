@@ -1,0 +1,295 @@
+[
+  {
+    "case_id": "nextjs-product-page",
+    "capability_id": "nextjs-fullstack",
+    "project_id": "next-product",
+    "prompt": "Build a Next.js product page with a server health route and no database.",
+    "expected_paths": [
+      "frontend/package.json",
+      "frontend/app/page.tsx",
+      "frontend/app/api/health/route.ts"
+    ]
+  },
+  {
+    "case_id": "react-fastapi-game",
+    "capability_id": "react-fastapi",
+    "project_id": "web-game",
+    "prompt": "Build a two-player web game with React, TypeScript and FastAPI, without a database.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/pyproject.toml",
+      "README.md"
+    ]
+  },
+  {
+    "case_id": "react-node-dashboard",
+    "capability_id": "react-node",
+    "project_id": "node-dashboard",
+    "prompt": "Build a React dashboard with a Node.js Express TypeScript API and no database.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/package.json",
+      "backend/src/app.ts"
+    ]
+  },
+  {
+    "case_id": "fastapi-service",
+    "capability_id": "fastapi-api",
+    "project_id": "fastapi-service",
+    "prompt": "Build a FastAPI JSON service with health checks and no frontend or database.",
+    "expected_paths": [
+      "backend/pyproject.toml",
+      "README.md"
+    ]
+  },
+  {
+    "case_id": "node-service",
+    "capability_id": "node-api",
+    "project_id": "node-service",
+    "prompt": "Build a Node.js Express TypeScript API with health checks and no frontend.",
+    "expected_paths": [
+      "backend/package.json",
+      "backend/src/app.ts",
+      "backend/tests/app.test.mjs"
+    ]
+  },
+  {
+    "case_id": "react-frontend",
+    "capability_id": "react-vite",
+    "project_id": "react-frontend",
+    "prompt": "Build a standalone React Vite TypeScript landing page with no backend.",
+    "expected_paths": [
+      "frontend/package.json",
+      "README.md"
+    ]
+  },
+  {
+    "case_id": "heritage-gallery-regression",
+    "capability_id": "react-vite",
+    "project_id": "india-heritage-gallery",
+    "prompt": "build a simple website of one page website without any database. just showing images of India's heritage and beautifull places. do not do any deployment or anything like github push and all, just a simple webpage.",
+    "expected_paths": [
+      "frontend/package.json",
+      "frontend/src/App.tsx",
+      "README.md"
+    ]
+  },
+  {
+    "case_id": "python-cli",
+    "capability_id": "python-cli",
+    "project_id": "release-cli",
+    "prompt": "Build a Python CLI that describes a release and requires no server or database.",
+    "expected_paths": [
+      "backend/pyproject.toml",
+      "backend/tests/test_cli.py",
+      "README.md"
+    ]
+  },
+  {
+    "case_id": "wallet-commerce-rbac",
+    "capability_id": "react-fastapi",
+    "project_id": "wallet-commerce-insights",
+    "prompt": "Build a React and FastAPI shopping cart application with login, user and admin roles, a default wallet balance, checkout, exact transaction history, a Supabase PostgreSQL database, five seeded users, and an admin-only analytics dashboard for spending and product performance.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/pyproject.toml",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "auth-rbac",
+      "persistence",
+      "commerce",
+      "analytics"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "standalone-browser-game",
+    "capability_id": "react-vite",
+    "project_id": "neon-grid-arena",
+    "prompt": "Build a standalone React Vite TypeScript browser game with keyboard controls, deterministic score and level transitions, pause, reset, game-over state, responsive canvas presentation, and focused interaction tests. No backend, database, authentication, or deployment.",
+    "expected_paths": [
+      "frontend/package.json",
+      "frontend/src/App.tsx",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "browser-game"
+    ],
+    "expected_workers": [
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "video-membership-library",
+    "capability_id": "react-fastapi",
+    "project_id": "indie-screen-library",
+    "prompt": "Build a React and FastAPI video platform with sign in, member and curator roles, a responsive movie catalog, accessible video playback, protected media upload with size and content-type validation, PostgreSQL persistence, loading and playback errors, and focused tests.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/pyproject.toml",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "video-platform",
+      "auth-rbac",
+      "file-upload",
+      "persistence"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "realtime-team-scheduler",
+    "capability_id": "react-node",
+    "project_id": "pulse-team-scheduler",
+    "prompt": "Build a React and Node Express TypeScript live collaboration scheduling application with login, organization workspaces, PostgreSQL persistence, a shared calendar, WebSocket presence and updates, reconnect and duplicate-event handling, tenant isolation, booking conflict prevention, and tests.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/package.json",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "realtime",
+      "auth-rbac",
+      "multi-tenant",
+      "persistence",
+      "scheduling"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "genre-browser-game",
+    "capability_id": "react-vite",
+    "project_id": "orbit-tower-defence",
+    "prompt": "Build a browser game: a tower defence arcade game with enemy waves, tower upgrades, a pause menu, deterministic game state transitions, a restart flow, and a local high-score table. No backend and no database.",
+    "expected_paths": [
+      "frontend/package.json",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "browser-game"
+    ],
+    "expected_workers": [
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "genre-commerce-rbac",
+    "capability_id": "react-fastapi",
+    "project_id": "meridian-storefront",
+    "prompt": "Build a React and FastAPI online store with a shopping cart, login, customer and admin roles, inventory with stock limits, exact order totals, order history, admin-only refunds, and a PostgreSQL database with seeded products.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/pyproject.toml",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "commerce",
+      "auth-rbac",
+      "persistence"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "genre-social-platform",
+    "capability_id": "react-node",
+    "project_id": "commons-social",
+    "prompt": "Build a React and Node Express social content platform with login, user profiles, follows, image upload for posts, a reverse-chronological feed, likes, comments, and a PostgreSQL database with seeded users.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/package.json",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "content-platform",
+      "auth-rbac",
+      "file-upload",
+      "persistence"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "genre-video-platform",
+    "capability_id": "react-fastapi",
+    "project_id": "reel-vault",
+    "prompt": "Build a React and FastAPI members-only video platform with login, subscriber and admin roles, video upload with size and content-type validation, processing status, HLS playback, and a PostgreSQL database.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/pyproject.toml",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "video-platform",
+      "auth-rbac",
+      "file-upload",
+      "persistence"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "genre-ai-assistant",
+    "capability_id": "react-fastapi",
+    "project_id": "atlas-ai-assistant",
+    "prompt": "Build a React and FastAPI AI assistant with server-side OpenAI calls, login, per-user conversation history in a PostgreSQL database, request quotas, and explicit timeout and malformed-response handling.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/pyproject.toml",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "ai-integration",
+      "auth-rbac",
+      "persistence"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  },
+  {
+    "case_id": "genre-geo-fleet",
+    "capability_id": "react-node",
+    "project_id": "wayfare-fleet",
+    "prompt": "Build a React and Node Express delivery fleet dashboard with a map of live vehicle positions, route history, an accessible list alternative to the map, driver shift scheduling, and a PostgreSQL database.",
+    "expected_paths": [
+      "frontend/package.json",
+      "backend/package.json",
+      "README.md"
+    ],
+    "expected_adapters": [
+      "geospatial",
+      "persistence",
+      "scheduling"
+    ],
+    "expected_workers": [
+      "database",
+      "backend",
+      "frontend"
+    ]
+  }
+]

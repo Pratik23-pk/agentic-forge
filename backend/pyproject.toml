@@ -1,0 +1,44 @@
+[project]
+name = "software-developer-agent"
+version = "0.1.0"
+description = "Production-oriented multi-agent software development system."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.0",
+  "langgraph==1.2.9",
+  "langgraph-checkpoint-postgres==3.1.2",
+  "langsmith>=0.2.0",
+  "openai>=1.50.0",
+  "psycopg[binary]>=3.2.0",
+  "pydantic>=2.8.0",
+  "pydantic-settings>=2.4.0",
+  "python-dotenv>=1.0.1",
+  "redis>=5.0.8",
+  "uvicorn[standard]>=0.30.6"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "pytest-asyncio>=0.23.0",
+  "playwright>=1.49.0",
+  "ruff>=0.6.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+"src/software_developer_agent/agents/workers/base.py" = ["BLE001"]
+"src/software_developer_agent/mcp/server.py" = ["BLE001"]
+"src/software_developer_agent/observability/langsmith.py" = ["BLE001"]
