@@ -131,8 +131,8 @@
 
 /*
  * Motion. The stock CSS curves are too weak, so `ease-out` and `ease-in-out`
- * are replaced with strong variants. There is deliberately no strong
- * `ease-in`: UI never uses it.
+ * are replaced with strong variants. Interface motion never eases in:
+ * starting slow reads as lag.
  */
 @theme {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);

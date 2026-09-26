@@ -2,6 +2,7 @@
   "name": "agentic-forge-studio",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 5173",
     "build": "next build",
