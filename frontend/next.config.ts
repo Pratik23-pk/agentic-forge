@@ -6,6 +6,11 @@ const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactCompiler: true,
+  experimental: {
+    // Starting a preview blocks while Docker builds the app; the default
+    // rewrite proxy timeout (30 s) would cut it off.
+    proxyTimeout: 10 * 60 * 1000,
+  },
   async rewrites() {
     return {
       beforeFiles: [],
