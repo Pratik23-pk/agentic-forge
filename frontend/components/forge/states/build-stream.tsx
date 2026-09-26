@@ -92,8 +92,12 @@ export function BuildStream() {
         <Specimen label="Approval gate" className="rounded-none border-0 bg-transparent p-0">
           <CheckpointCard
             checkpoint={CHECKPOINT}
-            onApprove={() => toast("Contract approved", { icon: <CheckIcon className="size-4" /> })}
-            onRequestChanges={(note) => toast("Changes requested", { description: note })}
+            onApprove={() => {
+              toast("Contract approved", { icon: <CheckIcon className="size-4" /> });
+            }}
+            onRequestChanges={(note) => {
+              toast("Changes requested", { description: note });
+            }}
           />
         </Specimen>
         <div className="flex flex-col gap-10">

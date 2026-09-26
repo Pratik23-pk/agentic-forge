@@ -2,7 +2,10 @@
  * Server-side access to the Python API. Used by route handlers and server
  * components; the browser reaches the same API through the /api rewrite.
  */
+import { describeBackendError } from "./errors";
 import type { BackendJob } from "./types";
+
+export { describeBackendError };
 
 export function backendUrl(): string {
   return (process.env.BACKEND_URL ?? "http://localhost:8000").replace(/\/+$/, "");
@@ -16,18 +19,6 @@ export class BackendError extends Error {
     super(message);
     this.name = "BackendError";
   }
-}
-
-/** FastAPI errors arrive as `{ detail: string | { message } | [...] }`. */
-export function describeBackendError(status: number, body: unknown): string {
-  const detail = (body as { detail?: unknown } | null)?.detail;
-  if (typeof detail === "string") return detail;
-  if (detail && typeof detail === "object" && "message" in detail && typeof detail.message === "string") {
-    return detail.message;
-  }
-  if (Array.isArray(detail) && detail[0] && typeof detail[0].msg === "string") return detail[0].msg;
-  if (status === 502 || status === 503) return "The build service is unavailable. Start the backend and try again.";
-  return `The build service returned an error (${status}).`;
 }
 
 export async function backendFetch<T>(path: string, init: RequestInit = {}): Promise<T> {

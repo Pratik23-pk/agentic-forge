@@ -1,8 +1,9 @@
 "use client";
 
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 
+import { CodeBlock } from "@/components/ai-elements/code-block";
 import {
   Confirmation,
   ConfirmationAccepted,
@@ -12,38 +13,76 @@ import {
   ConfirmationRequest,
   ConfirmationTitle,
 } from "@/components/ai-elements/confirmation";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { CheckpointPart } from "@/lib/contract";
 
-const GATE_LABEL: Record<CheckpointPart["gate"], string> = {
+const GATE_LABEL: Record<string, string> = {
   product_contract: "Product contract",
   privileged_action: "Scoped permission",
   release: "Release approval",
   worker_review: "Worker review",
 };
 
+export function gateLabel(gate: string): string {
+  return GATE_LABEL[gate] ?? "Review";
+}
+
 interface CheckpointCardProps {
   checkpoint: CheckpointPart;
-  onApprove?: (note: string) => void;
-  onRequestChanges?: (note: string) => void;
+  /** May return a promise; the card shows progress and resolves only if it succeeds. */
+  onApprove?: (note: string) => void | Promise<void>;
+  onRequestChanges?: (note: string) => void | Promise<void>;
+}
+
+function CheckpointVisual({ visual }: { visual: string }) {
+  const isJson = visual.trimStart().startsWith("{") || visual.trimStart().startsWith("[");
+  if (!isJson) {
+    return (
+      <pre className="overflow-x-auto rounded-md border bg-background px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+        {visual}
+      </pre>
+    );
+  }
+  return (
+    <Collapsible>
+      <CollapsibleTrigger className="group flex items-center gap-1 rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <ChevronRightIcon
+          aria-hidden="true"
+          className="size-3.5 transition-transform duration-150 ease-out group-data-[state=open]:rotate-90"
+        />
+        Show full contract
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2">
+        <CodeBlock code={visual} language="json" className="max-h-72 overflow-auto bg-background" />
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }
 
 /**
- * A human approval gate. Rendered with the AI SDK confirmation primitive so
- * Phase 2 can map backend checkpoints onto tool approval requests directly.
+ * A human approval gate, rendered with the AI SDK confirmation primitive.
+ * Once decided it resolves and its actions disappear, so a decision cannot
+ * be sent twice.
  */
 export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: CheckpointCardProps) {
   const [note, setNote] = useState("");
   const [askingForChanges, setAskingForChanges] = useState(false);
-  // Once decided, the card resolves and its actions disappear, so a decision
-  // cannot be sent twice.
   const [decision, setDecision] = useState<boolean | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function decide(approved: boolean) {
-    setDecision(approved);
+  async function decide(approved: boolean) {
     const trimmed = note.trim();
-    if (approved) onApprove?.(trimmed);
-    else onRequestChanges?.(trimmed);
+    setSubmitting(true);
+    try {
+      await (approved ? onApprove?.(trimmed) : onRequestChanges?.(trimmed));
+      setDecision(approved);
+    } catch {
+      // The caller reports the error; the card stays actionable so the user can retry.
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -57,17 +96,15 @@ export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: Chec
       className="gap-3 border-warning/20"
     >
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-warning">{GATE_LABEL[checkpoint.gate]}</span>
+        <span className="text-xs text-warning">{gateLabel(checkpoint.gate)}</span>
         <ConfirmationTitle className="text-[13px] font-medium text-foreground">
           {checkpoint.title}
         </ConfirmationTitle>
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{checkpoint.summary}</p>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          {checkpoint.prompt || checkpoint.summary}
+        </p>
       </div>
-      {checkpoint.visual ? (
-        <pre className="overflow-x-auto rounded-md border bg-background px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-          {checkpoint.visual}
-        </pre>
-      ) : null}
+      {checkpoint.visual ? <CheckpointVisual visual={checkpoint.visual} /> : null}
       <ConfirmationRequest>
         {askingForChanges ? (
           <Textarea
@@ -81,14 +118,15 @@ export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: Chec
         ) : null}
       </ConfirmationRequest>
       <ConfirmationActions>
+        {submitting ? <Spinner className="text-muted-foreground" /> : null}
         {askingForChanges ? (
           <>
-            <ConfirmationAction variant="ghost" onClick={() => setAskingForChanges(false)}>
+            <ConfirmationAction variant="ghost" disabled={submitting} onClick={() => setAskingForChanges(false)}>
               Cancel
             </ConfirmationAction>
             <ConfirmationAction
               variant="secondary"
-              disabled={!note.trim()}
+              disabled={!note.trim() || submitting}
               onClick={() => decide(false)}
             >
               Send changes
@@ -96,10 +134,10 @@ export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: Chec
           </>
         ) : (
           <>
-            <ConfirmationAction variant="ghost" onClick={() => setAskingForChanges(true)}>
+            <ConfirmationAction variant="ghost" disabled={submitting} onClick={() => setAskingForChanges(true)}>
               Request changes
             </ConfirmationAction>
-            <ConfirmationAction onClick={() => decide(true)}>
+            <ConfirmationAction disabled={submitting} onClick={() => decide(true)}>
               <CheckIcon data-icon="inline-start" />
               Approve
             </ConfirmationAction>

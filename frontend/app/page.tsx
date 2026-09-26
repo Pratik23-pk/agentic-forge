@@ -12,16 +12,19 @@ export default function Home() {
         <div className="flex flex-col gap-2">
           <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.02em]">Agentic Forge</h1>
           <p className="text-[15px] leading-relaxed text-muted-foreground">
-            The studio is being rebuilt on a new design system. The working studio stays on the main
-            branch until the new workspace lands.
+            Describe a product and get a planned, built and tested project you can run, edit and
+            download.
           </p>
         </div>
         <div className="flex gap-2">
           <Button asChild>
-            <Link href="/dev/states">
-              View the design system
+            <Link href="/studio">
+              Open the studio
               <ArrowRightIcon data-icon="inline-end" />
             </Link>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href="/dev/states">Design system</Link>
           </Button>
         </div>
       </div>
