@@ -35,9 +35,14 @@ const TestResultsContext = createContext<TestResultsContextType>({});
 
 const formatDuration = (ms: number) => {
   if (ms < 1000) {
-    return `${ms}ms`;
+    return `${Math.round(ms)}ms`;
   }
-  return `${(ms / 1000).toFixed(2)}s`;
+  if (ms < 60_000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+  const minutes = Math.floor(ms / 60_000);
+  const seconds = Math.round((ms % 60_000) / 1000);
+  return `${minutes}m ${seconds}s`;
 };
 
 export type TestResultsHeaderProps = HTMLAttributes<HTMLDivElement>;
@@ -72,7 +77,7 @@ export const TestResultsDuration = ({
   }
 
   return (
-    <span className={cn("text-muted-foreground text-sm", className)} {...props}>
+    <span className={cn("tabular text-muted-foreground text-xs", className)} {...props}>
       {children ?? formatDuration(summary.duration)}
     </span>
   );
@@ -377,10 +382,10 @@ export const TestDuration = ({
 
   return (
     <span
-      className={cn("ml-auto text-muted-foreground text-xs", className)}
+      className={cn("tabular ml-auto text-muted-foreground text-xs", className)}
       {...props}
     >
-      {children ?? `${duration}ms`}
+      {children ?? formatDuration(duration)}
     </span>
   );
 };
@@ -426,7 +431,7 @@ export const Test = ({
   return (
     <TestContext.Provider value={contextValue}>
       <div
-        className={cn("flex items-center gap-2 px-4 py-2 text-sm", className)}
+        className={cn("flex items-center gap-2 px-4 py-2 text-[13px]", className)}
         {...props}
       >
         {children ?? (

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Three stacked ingots on an ember tile: layers of work, forged in order.
+ * Three ingots stacked on an ember tile: work built up in layers.
  * Decorative; pair it with the wordmark or an accessible label.
  */
 export function BrandMark({ className }: { className?: string }) {
@@ -13,9 +13,9 @@ export function BrandMark({ className }: { className?: string }) {
     >
       <rect width="24" height="24" rx="6" fill="currentColor" />
       <g fill="var(--brand-foreground)">
-        <rect x="6" y="6.5" width="12" height="2.5" rx="1.25" />
-        <rect x="7.5" y="10.75" width="9" height="2.5" rx="1.25" />
-        <rect x="9" y="15" width="6" height="2.5" rx="1.25" />
+        <rect x="9.5" y="6" width="5" height="3" rx="0.75" />
+        <rect x="7.5" y="10.5" width="9" height="3" rx="0.75" />
+        <rect x="5.5" y="15" width="13" height="3" rx="0.75" />
       </g>
     </svg>
   );

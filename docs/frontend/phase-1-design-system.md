@@ -7,12 +7,12 @@ restrained design system (tokens, motion, primitives, domain status components a
 Elements) is fully demonstrated on a `/dev/states` reference page.
 
 **Architecture:** Next.js 16 App Router in `frontend/`, Tailwind CSS v4 with CSS-first tokens in
-`app/globals.css`, shadcn/ui (Base UI primitives, `base-nova` preset) for primitives, AI Elements
+`app/globals.css`, shadcn/ui (Radix primitives, `radix-nova` style) for primitives, AI Elements
 for AI-specific surfaces, and a thin `components/forge/` layer for product-specific pieces. The
 Python API is reached through a Next.js `fallback` rewrite of `/api/*`, which leaves room for the
 Phase 2 gateway routes under `/api/chat`.
 
-**Tech Stack:** Next.js 16, React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui 4 (Base UI),
+**Tech Stack:** Next.js 16, React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui 4 (Radix),
 AI Elements 1.x, lucide-react, Geist Sans/Mono (`geist` package), Vitest + Testing Library.
 
 **Spec:** `docs/frontend/roadmap.md` (Phase 1 row) and the design brief below.
@@ -118,12 +118,12 @@ frontend/
 
 **Produces:** `npm run dev|build|lint|typecheck|test` in `frontend/`; `@/` import alias.
 
-- [ ] **Step 1:** `git rm -r` the old frontend sources and configs listed above.
-- [ ] **Step 2:** `npx create-next-app@latest frontend --ts --tailwind --eslint --app --no-src-dir --import-alias "@/*" --use-npm --turbopack --yes`
-- [ ] **Step 3:** `npx shadcn@latest init --preset base-nova` inside `frontend/`.
-- [ ] **Step 4:** Set scripts: `"dev": "next dev -p 5173"`, `"typecheck": "tsc --noEmit"`,
+- [x] **Step 1:** `git rm -r` the old frontend sources and configs listed above.
+- [x] **Step 2:** `npx create-next-app@latest frontend --ts --tailwind --eslint --app --no-src-dir --import-alias "@/*" --use-npm --turbopack --yes`
+- [x] **Step 3:** `npx shadcn@latest init --preset base-nova` inside `frontend/`.
+- [x] **Step 4:** Set scripts: `"dev": "next dev -p 5173"`, `"typecheck": "tsc --noEmit"`,
   `"test": "vitest run"`; add `noUnusedLocals`/`noUnusedParameters` to `tsconfig.json`.
-- [ ] **Step 5:** `next.config.ts`:
+- [x] **Step 5:** `next.config.ts`:
 
 ```ts
 import type { NextConfig } from "next";
@@ -144,18 +144,18 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Step 6:** Vitest + Testing Library + jsdom; `vitest.config.ts` with the `@` alias.
-- [ ] **Step 7:** Dockerfile (Node 22 alpine, `npm ci`, `next build`, copy `.next/standalone`,
+- [x] **Step 6:** Vitest + Testing Library + jsdom; `vitest.config.ts` with the `@` alias.
+- [x] **Step 7:** Dockerfile (Node 22 alpine, `npm ci`, `next build`, copy `.next/standalone`,
   `.next/static`, `public`; `CMD node server.js` on port 3000).
-- [ ] **Step 8:** CI frontend job: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
-- [ ] **Step 9:** Verify `npm run build` and `npm run lint` pass. Commit
+- [x] **Step 8:** CI frontend job: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
+- [x] **Step 9:** Verify `npm run build` and `npm run lint` pass. Commit
   `chore(frontend): replace Vite studio with Next.js 16 scaffold`.
 
 ### Task 2: Tokens, typography and motion
 
 **Files:** Modify `frontend/app/globals.css`, `frontend/app/layout.tsx`
 
-- [ ] **Step 1:** Replace generated `globals.css` token blocks with a single dark token set:
+- [x] **Step 1:** Replace generated `globals.css` token blocks with a single dark token set:
 
 ```css
 :root {
@@ -187,13 +187,13 @@ export default nextConfig;
 }
 ```
 
-- [ ] **Step 2:** Map them in `@theme inline` (`--color-brand`, `--color-success`, …), add
+- [x] **Step 2:** Map them in `@theme inline` (`--color-brand`, `--color-success`, …), add
   `--font-sans`/`--font-mono` from Geist variables and the three easing curves as
   `--ease-out-strong`, `--ease-in-out-strong`, `--ease-drawer`.
-- [ ] **Step 3:** Base layer: `color-scheme: dark`, font feature settings, `::selection` in brand at
+- [x] **Step 3:** Base layer: `color-scheme: dark`, font feature settings, `::selection` in brand at
   30%, thin neutral scrollbars, `:focus-visible` ring (2px ring, 2px offset on background),
   `tabular-nums` utility for figures.
-- [ ] **Step 4:** Reduced motion:
+- [x] **Step 4:** Reduced motion:
 
 ```css
 @media (prefers-reduced-motion: reduce) {
@@ -206,23 +206,23 @@ export default nextConfig;
 }
 ```
 
-- [ ] **Step 5:** `layout.tsx`: `GeistSans.variable GeistMono.variable`, `className="dark"`,
+- [x] **Step 5:** `layout.tsx`: `GeistSans.variable GeistMono.variable`, `className="dark"`,
   `antialiased`, metadata (`Agentic Forge`), `<Toaster />`.
-- [ ] **Step 6:** Build passes. Commit `feat(frontend): dark design tokens, type and motion system`.
+- [x] **Step 6:** Build passes. Commit `feat(frontend): dark design tokens, type and motion system`.
 
 ### Task 3: Primitives, tuned for motion
 
 **Files:** Create `frontend/components/ui/*` via CLI; modify `button.tsx` and overlay components.
 
-- [ ] **Step 1:** `npx shadcn@latest add button badge card input textarea separator skeleton tooltip
+- [x] **Step 1:** `npx shadcn@latest add button badge card input textarea separator skeleton tooltip
   dropdown-menu dialog tabs scroll-area resizable kbd spinner sonner alert empty field select
   switch toggle-group progress collapsible`
-- [ ] **Step 2:** Read every generated file. Enforce: pressables use
+- [x] **Step 2:** Read every generated file. Enforce: pressables use
   `transition-[transform,background-color,color,border-color,box-shadow] duration-150 ease-out-strong active:scale-[0.97]`;
   no `transition-all`; popover, dropdown, select and tooltip content use
   `origin-(--transform-origin)` with a 150ms enter from `scale-[0.96] opacity-0`; dialogs enter
   200ms from `scale-[0.97] opacity-0`, centred; exits are shorter than entrances.
-- [ ] **Step 3:** Build + lint pass. Commit `feat(frontend): shadcn primitives with motion tuning`.
+- [x] **Step 3:** Build + lint pass. Commit `feat(frontend): shadcn primitives with motion tuning`.
 
 ### Task 4: Contract draft and status system
 
@@ -236,7 +236,7 @@ export default nextConfig;
 - `describeRelease(status: string): { label: string; tone: Tone; description: string }`
 - `<StatusDot tone live />`, `<StatusBadge status kind="job" | "stage" />`, `<ReleaseBadge status />`
 
-- [ ] **Step 1: Failing tests** in `lib/status.test.ts`:
+- [x] **Step 1: Failing tests** in `lib/status.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -271,52 +271,52 @@ describe("describeRelease", () => {
 });
 ```
 
-- [ ] **Step 2:** `npm test` → FAIL (module not found).
-- [ ] **Step 3:** Implement `lib/status.ts` with lookup tables for job statuses
+- [x] **Step 2:** `npm test` → FAIL (module not found).
+- [x] **Step 3:** Implement `lib/status.ts` with lookup tables for job statuses
   (`pending | running | awaiting_human_feedback | evaluating | retrying | succeeded | failed | blocked`),
   stage statuses (`queued | running | review | done | failed`) and release statuses
   (`pending | verified | provisional | quarantined`), each with an `Unknown` fallback.
-- [ ] **Step 4:** `npm test` → PASS.
-- [ ] **Step 5:** `lib/contract.ts`: the `ForgeDataParts` map and `ForgeMessage` type from the roadmap
+- [x] **Step 4:** `npm test` → PASS.
+- [x] **Step 5:** `lib/contract.ts`: the `ForgeDataParts` map and `ForgeMessage` type from the roadmap
   (`stage`, `file`, `validation`, `checkpoint`, `preview`, `release`, `notice`) typed with
   `UIMessage` from `ai`.
-- [ ] **Step 6:** `components/forge/status.tsx` renders tone via semantic tokens; the live dot pulses
+- [x] **Step 6:** `components/forge/status.tsx` renders tone via semantic tokens; the live dot pulses
   opacity only (1.6s, `ease-in-out-strong`), disabled under reduced motion; every badge has a text label.
-- [ ] **Step 7:** Commit `feat(frontend): status system and draft event contract`.
+- [x] **Step 7:** Commit `feat(frontend): status system and draft event contract`.
 
 ### Task 5: AI Elements, restyled
 
 **Files:** Create `frontend/components/ai-elements/*` via CLI.
 
-- [ ] **Step 1:** `npx shadcn@latest add https://registry.ai-sdk.dev/<name>.json` for: `conversation`,
+- [x] **Step 1:** `npx shadcn@latest add https://registry.ai-sdk.dev/<name>.json` for: `conversation`,
   `message`, `prompt-input`, `plan`, `task`, `tool`, `confirmation`, `code-block`, `file-tree`,
   `web-preview`, `terminal`, `test-results`, `context`.
-- [ ] **Step 2:** Review every file: replace raw palette classes with semantic tokens and status
+- [x] **Step 2:** Review every file: replace raw palette classes with semantic tokens and status
   tones, remove gradients/glows/sparkle icons, align motion with Task 3 rules, keep API unchanged
   so upstream updates stay mergeable.
-- [ ] **Step 3:** Typecheck, lint and build pass. Commit `feat(frontend): add AI Elements restyled to the design system`.
+- [x] **Step 3:** Typecheck, lint and build pass. Commit `feat(frontend): add AI Elements restyled to the design system`.
 
 ### Task 6: Fixtures and forge components
 
 **Files:** Create `frontend/lib/fixtures.ts`, `frontend/components/brand-mark.tsx` (under `forge/`),
 `frontend/components/forge/stage-list.tsx`
 
-- [ ] **Step 1:** `lib/fixtures.ts` exports typed data covering: stage lists for building, review,
+- [x] **Step 1:** `lib/fixtures.ts` exports typed data covering: stage lists for building, review,
   failed and verified runs; a product-contract checkpoint; validation results (passing, failing
   with stderr excerpt); a file tree of a React + FastAPI project including a 120-character path;
   a code sample; preview log lines; a cost ledger.
-- [ ] **Step 2:** `StageList` renders `ForgeDataParts["stage"][]` with `StatusDot`, label, attempt
+- [x] **Step 2:** `StageList` renders `ForgeDataParts["stage"][]` with `StatusDot`, label, attempt
   count, detail line; new items enter with `data-motion="rise"` (180ms, 4px, 40ms stagger).
-- [ ] **Step 3:** `BrandMark`: a geometric anvil/spark mark in `text-brand`, 20px default, `aria-hidden`
+- [x] **Step 3:** `BrandMark`: a geometric anvil/spark mark in `text-brand`, 20px default, `aria-hidden`
   with an accessible wordmark next to it.
-- [ ] **Step 4:** Commit `feat(frontend): fixtures, brand mark and stage list`.
+- [x] **Step 4:** Commit `feat(frontend): fixtures, brand mark and stage list`.
 
 ### Task 7: `/dev/states` reference page and holding page
 
 **Files:** Create `frontend/app/dev/states/page.tsx`, `frontend/components/forge/states/*.tsx`,
 `frontend/app/page.tsx`, `frontend/app/not-found.tsx`
 
-- [ ] **Step 1:** Sections, each a component in `components/forge/states/`:
+- [x] **Step 1:** Sections, each a component in `components/forge/states/`:
   1. Foundations — surfaces, text colours, status tones, type scale, radius, easing demos.
   2. Primitives — buttons (variants, sizes, loading), inputs, select, switch, toggle group, tabs,
      tooltip, dropdown, dialog, toast, alert, empty, skeleton, progress.
@@ -326,13 +326,13 @@ describe("describeRelease", () => {
   5. Code — file tree + code block with a long path.
   6. Preview — web preview frame (empty, starting, failed), terminal logs.
   7. Workspace composition — resizable two-pane studio layout composed from the above with fixtures.
-- [ ] **Step 2:** Sticky section nav on the left; page `metadata.robots = { index: false }`.
-- [ ] **Step 3:** `app/page.tsx`: restrained holding page (brand mark, one sentence, links to
+- [x] **Step 2:** Sticky section nav on the left; page `metadata.robots = { index: false }`.
+- [x] **Step 3:** `app/page.tsx`: restrained holding page (brand mark, one sentence, links to
   `/dev/states` and the roadmap). No hero gradients, no animation beyond a single 200ms fade-in.
-- [ ] **Step 4:** Run `npm run lint && npm run typecheck && npm test && npm run build`.
-- [ ] **Step 5:** Screenshot `/` and `/dev/states` at 1440×900 and 390×844; check focus rings via
+- [x] **Step 4:** Run `npm run lint && npm run typecheck && npm test && npm run build`.
+- [x] **Step 5:** Screenshot `/` and `/dev/states` at 1440×900 and 390×844; check focus rings via
   keyboard, check reduced motion with emulation.
-- [ ] **Step 6:** Commit `feat(frontend): design system reference at /dev/states`.
+- [x] **Step 6:** Commit `feat(frontend): design system reference at /dev/states`.
 
 ## Self-review
 
@@ -340,3 +340,33 @@ describe("describeRelease", () => {
   AI Elements (T5), fixtures + forge components (T6), reference page (T7). Old CSS removal is T1.
 - Review focus items map to T4 (unknown status), T2/T7 (reduced motion, focus), T6 (long paths),
   T1/T2 (offline fonts).
+
+## Outcome and deviations
+
+Implemented on `feat/frontend-phase-1-design-system`. Lint, typecheck, 28 tests and the production
+build pass from a clean checkout. Verified in a browser at 1440×900 and 390×844, with reduced
+motion emulated and keyboard focus checked.
+
+- **Radix instead of Base UI.** AI Elements failed to type-check against the Base UI primitives,
+  so the preset is `radix-nova`. Popovers still scale from their trigger via Radix's
+  `--radix-*-transform-origin` variables.
+- **`context` element removed.** It prices usage from a model catalogue (`tokenlens`) that does
+  not know the backend's models. `CostMeter` shows the backend's own cost ledger instead.
+- **`shimmer` and `motion` removed.** Shimmering text is an AI cliché; streaming plan titles are
+  muted until complete.
+- **Upstream AI Elements bugs fixed locally:** hydration mismatch and ref-during-render in
+  `code-block`, non-focusable `TaskTrigger`, missing `aria-selected` on file tree items,
+  millisecond-only test durations.
+- **Added:** `lib/file-tree.ts` (flat paths to a sorted tree, tested), `ProjectFiles`,
+  `CheckpointCard`, `ValidationResults`, `FallbackNotice`, and `tests/design-rules.test.ts`,
+  which fails CI on any banned pattern from the design brief.
+- **Security:** `linkify-it` pinned to a patched version (ReDoS reachable through preview logs);
+  `srcDoc` previews get an empty sandbox because they inherit the studio origin.
+- **Not verified:** the Docker image (Docker was not running during implementation).
+
+### Carry into Phase 3
+
+- Real previews: keep `allow-scripts allow-same-origin` only for cross-origin sandbox URLs; the
+  browser warns that the combination can escape the sandbox on same-origin content.
+- Next.js rewrites do not proxy WebSockets reliably; the collaboration socket needs a direct
+  backend URL or a gateway route.

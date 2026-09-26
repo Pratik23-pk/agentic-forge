@@ -157,7 +157,7 @@ const getHighlighter = (
 
   const highlighterPromise = createHighlighter({
     langs: [language],
-    themes: ["github-light", "github-dark"],
+    themes: ["github-light", "vesper"],
   });
 
   highlighterCache.set(language, highlighterPromise);
@@ -278,7 +278,7 @@ const CodeBlockBody = memo(
       >
         <code
           className={cn(
-            "font-mono text-sm",
+            "font-mono",
             showLineNumbers && "[counter-increment:line_0] [counter-reset:line]"
           )}
         >
@@ -380,19 +380,14 @@ export const CodeBlockContent = ({
   language: BundledLanguage;
   showLineNumbers?: boolean;
 }) => {
-  // Memoized raw tokens for immediate display
+  // Raw tokens render first on both server and client. Reading the
+  // highlight cache during render would differ between the two (the build
+  // may have warmed it) and break hydration, so colours arrive after mount.
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
 
-  // Synchronous cache lookup — avoids setState in effect for cached results
-  const syncTokens = useMemo(
-    () => highlightCode(code, language) ?? rawTokens,
-    [code, language, rawTokens]
-  );
-
-  // Async highlighting result (populated after shiki loads). The result
-  // carries the input it was computed for, so a stale result is ignored
-  // without touching refs or setting state during render.
-  const [asyncResult, setAsyncResult] = useState<{
+  // The result carries the input it was computed for, so a stale result is
+  // ignored without touching refs or setting state during render.
+  const [highlighted, setHighlighted] = useState<{
     code: string;
     language: BundledLanguage;
     tokens: TokenizedCode;
@@ -400,12 +395,17 @@ export const CodeBlockContent = ({
 
   useEffect(() => {
     let cancelled = false;
-
-    highlightCode(code, language, (result) => {
+    const apply = (tokens: TokenizedCode) => {
       if (!cancelled) {
-        setAsyncResult({ code, language, tokens: result });
+        setHighlighted({ code, language, tokens });
       }
-    });
+    };
+
+    const cached = highlightCode(code, language, apply);
+    if (cached) {
+      // Already highlighted elsewhere; apply on the next frame.
+      requestAnimationFrame(() => apply(cached));
+    }
 
     return () => {
       cancelled = true;
@@ -413,9 +413,9 @@ export const CodeBlockContent = ({
   }, [code, language]);
 
   const tokenized =
-    asyncResult?.code === code && asyncResult.language === language
-      ? asyncResult.tokens
-      : syncTokens;
+    highlighted?.code === code && highlighted.language === language
+      ? highlighted.tokens
+      : rawTokens;
 
   return (
     <div className="relative overflow-auto">

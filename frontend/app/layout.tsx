@@ -21,7 +21,7 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={cn("dark h-full", GeistSans.variable, GeistMono.variable)}>
       <body className="min-h-full">

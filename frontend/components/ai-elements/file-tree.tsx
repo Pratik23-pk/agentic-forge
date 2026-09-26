@@ -82,7 +82,7 @@ export const FileTree = ({
     <FileTreeContext.Provider value={contextValue}>
       <div
         className={cn(
-          "rounded-lg border bg-background font-mono text-sm",
+          "rounded-lg border bg-background text-[13px]",
           className
         )}
         role="tree"
@@ -206,7 +206,7 @@ export const FileTreeFolder = ({
             </button>
           </div>
           <CollapsibleContent>
-            <div className="ml-4 border-l pl-2">{children}</div>
+            <div className="ml-3.5 border-l pl-1.5">{children}</div>
           </CollapsibleContent>
         </div>
       </Collapsible>
