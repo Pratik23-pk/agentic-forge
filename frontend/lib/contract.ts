@@ -49,25 +49,27 @@ export type ForgeDataParts = {
   };
   checkpoint: {
     checkpointId: string;
-    gate: "product_contract" | "privileged_action" | "release" | "worker_review";
+    gate: "product_contract" | "privileged_action" | "release" | "worker_review" | (string & {});
+    status: "pending" | "approved" | "changes_requested" | "auto_approved" | (string & {});
     title: string;
+    prompt: string;
     summary: string;
+    /** Pretty-printed JSON or plain text the reviewer is approving. */
     visual?: string;
+    response?: string;
   };
-  preview: {
-    status: "starting" | "running" | "stopped" | "failed";
-    url?: string;
+  /** One per job: outcome, cost and whether a template stood in for model output. */
+  job: {
+    status: string;
+    releaseStatus: ReleaseStatus | (string & {});
+    costUsd: number;
+    budgetUsd: number;
+    usedFallback: boolean;
+    artifactsReady: boolean;
     error?: string;
   };
-  release: {
-    status: ReleaseStatus;
-    /** True when a worker fell back to a template instead of model output. */
-    usedFallback: boolean;
-    costUsd: number;
-  };
-  /** Sent transient: surfaced as a toast, never stored in message history. */
-  notice: {
-    level: "info" | "warn";
+  /** Markdown summary. A data part (not text) so re-attaching never duplicates it. */
+  summary: {
     text: string;
   };
 };
@@ -75,6 +77,7 @@ export type ForgeDataParts = {
 export type ForgeMessageMetadata = {
   jobId: string;
   projectId: string;
+  basedOnJobId?: string;
 };
 
 export type ForgeMessage = UIMessage<ForgeMessageMetadata, ForgeDataParts>;
@@ -83,7 +86,8 @@ export type StagePart = ForgeDataParts["stage"];
 export type FilePart = ForgeDataParts["file"];
 export type ValidationPart = ForgeDataParts["validation"];
 export type CheckpointPart = ForgeDataParts["checkpoint"];
-export type ReleasePart = ForgeDataParts["release"];
+export type JobPart = ForgeDataParts["job"];
+export type SummaryPart = ForgeDataParts["summary"];
 
 export const STAGE_LABELS: Record<StageId, string> = {
   plan: "Plan",

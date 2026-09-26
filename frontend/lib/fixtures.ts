@@ -5,7 +5,6 @@
 import type {
   CheckpointPart,
   FilePart,
-  ReleasePart,
   StagePart,
   ValidationPart,
 } from "@/lib/contract";
@@ -76,7 +75,9 @@ export const PLAN_STEPS = [
 export const CHECKPOINT: CheckpointPart = {
   checkpointId: "chk_7f2a",
   gate: "product_contract",
+  status: "pending",
   title: "Approve the product contract",
+  prompt: "Confirm the scope, stack and workers before implementation begins.",
   summary:
     "Three workers will build a React frontend, a FastAPI backend and a PostgreSQL schema. Payments are excluded until you choose a provider.",
   visual: `customers ──< subscriptions >── plans
@@ -160,10 +161,6 @@ export const PREVIEW_LOGS = `\u001b[2m08:14:02\u001b[0m frontend  VITE v8.3.1  r
 \u001b[2m08:14:05\u001b[0m backend   INFO:     127.0.0.1 - "GET /api/plans HTTP/1.1" \u001b[32m200\u001b[0m
 \u001b[2m08:14:06\u001b[0m backend   \u001b[33mWARNING\u001b[0m:  Slow query on deliveries (412 ms)
 \u001b[2m08:14:07\u001b[0m frontend  hmr update /src/components/DeliveryCalendar.tsx`;
-
-export const RELEASE_VERIFIED: ReleasePart = { status: "verified", usedFallback: false, costUsd: 0.184 };
-
-export const RELEASE_FALLBACK: ReleasePart = { status: "provisional", usedFallback: true, costUsd: 0.041 };
 
 export const COST = { spentUsd: 0.184, budgetUsd: 1, promptTokens: 48_210, completionTokens: 21_560 };
 
