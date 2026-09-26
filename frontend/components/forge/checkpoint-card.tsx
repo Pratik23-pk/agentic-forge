@@ -5,8 +5,10 @@ import { useState } from "react";
 
 import {
   Confirmation,
+  ConfirmationAccepted,
   ConfirmationAction,
   ConfirmationActions,
+  ConfirmationRejected,
   ConfirmationRequest,
   ConfirmationTitle,
 } from "@/components/ai-elements/confirmation";
@@ -33,11 +35,25 @@ interface CheckpointCardProps {
 export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: CheckpointCardProps) {
   const [note, setNote] = useState("");
   const [askingForChanges, setAskingForChanges] = useState(false);
+  // Once decided, the card resolves and its actions disappear, so a decision
+  // cannot be sent twice.
+  const [decision, setDecision] = useState<boolean | null>(null);
+
+  function decide(approved: boolean) {
+    setDecision(approved);
+    const trimmed = note.trim();
+    if (approved) onApprove?.(trimmed);
+    else onRequestChanges?.(trimmed);
+  }
 
   return (
     <Confirmation
-      approval={{ id: checkpoint.checkpointId }}
-      state="approval-requested"
+      approval={
+        decision === null
+          ? { id: checkpoint.checkpointId }
+          : { id: checkpoint.checkpointId, approved: decision, reason: note.trim() || undefined }
+      }
+      state={decision === null ? "approval-requested" : "approval-responded"}
       className="gap-3 border-warning/20"
     >
       <div className="flex flex-col gap-1">
@@ -73,7 +89,7 @@ export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: Chec
             <ConfirmationAction
               variant="secondary"
               disabled={!note.trim()}
-              onClick={() => onRequestChanges?.(note.trim())}
+              onClick={() => decide(false)}
             >
               Send changes
             </ConfirmationAction>
@@ -83,13 +99,24 @@ export function CheckpointCard({ checkpoint, onApprove, onRequestChanges }: Chec
             <ConfirmationAction variant="ghost" onClick={() => setAskingForChanges(true)}>
               Request changes
             </ConfirmationAction>
-            <ConfirmationAction onClick={() => onApprove?.(note.trim())}>
+            <ConfirmationAction onClick={() => decide(true)}>
               <CheckIcon data-icon="inline-start" />
               Approve
             </ConfirmationAction>
           </>
         )}
       </ConfirmationActions>
+      <ConfirmationAccepted>
+        <p className="flex items-center gap-1.5 text-[13px] text-success">
+          <CheckIcon className="size-3.5" aria-hidden="true" />
+          Approved. The build continues.
+        </p>
+      </ConfirmationAccepted>
+      <ConfirmationRejected>
+        <p className="text-[13px] text-muted-foreground">
+          Changes requested: <span className="text-foreground">{note.trim()}</span>
+        </p>
+      </ConfirmationRejected>
     </Confirmation>
   );
 }

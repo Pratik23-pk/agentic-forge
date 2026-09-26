@@ -405,6 +405,7 @@ export const TestStatus = ({
       {...props}
     >
       {children ?? statusIcons[status]}
+      <span className="sr-only">{status}</span>
     </span>
   );
 };

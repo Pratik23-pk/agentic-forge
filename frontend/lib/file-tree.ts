@@ -5,7 +5,11 @@ export type FileTreeNode =
 type MutableFolder = { kind: "folder"; name: string; path: string; children: Map<string, MutableNode> };
 type MutableNode = { kind: "file"; name: string; path: string } | MutableFolder;
 
-/** Turns flat project paths into a sorted tree: folders first, then files, by name. */
+/**
+ * Turns flat project paths into a sorted tree: folders first, then files, by
+ * name. A filesystem cannot hold a file and a folder at the same path, so if
+ * the input contains both (`a` and `a/b.ts`) the folder wins.
+ */
 export function buildFileTree(paths: readonly string[]): FileTreeNode[] {
   const root: MutableFolder = { kind: "folder", name: "", path: "", children: new Map() };
 

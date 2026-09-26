@@ -141,11 +141,10 @@ const tokensCache = new Map<string, TokenizedCode>();
 // Subscribers for async token updates
 const subscribers = new Map<string, Set<(result: TokenizedCode) => void>>();
 
-const getTokensCacheKey = (code: string, language: BundledLanguage) => {
-  const start = code.slice(0, 100);
-  const end = code.length > 100 ? code.slice(-100) : "";
-  return `${language}:${code.length}:${start}:${end}`;
-};
+// Keyed on the full source: a sampled key (length plus head and tail) lets two
+// same-length files that differ in the middle share highlighting.
+const getTokensCacheKey = (code: string, language: BundledLanguage) =>
+  `${language}:${code}`;
 
 const getHighlighter = (
   language: BundledLanguage
@@ -498,6 +497,7 @@ export const CodeBlockCopyButton = ({
 
   return (
     <Button
+      aria-label={isCopied ? "Copied" : "Copy code"}
       className={cn("shrink-0", className)}
       onClick={copyToClipboard}
       size="icon"

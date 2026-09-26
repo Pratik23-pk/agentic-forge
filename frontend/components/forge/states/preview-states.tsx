@@ -69,7 +69,7 @@ export function PreviewFrame({ className }: { className?: string }) {
         </WebPreviewNavigationButton>
       </WebPreviewNavigation>
       <div className="flex flex-1 justify-center bg-background">
-        <div className={cn("flex flex-col transition-[width] duration-200 ease-in-out", DEVICE_WIDTH[device])}>
+        <div className={cn("flex flex-col transition-[width] duration-200 ease-in-out motion-reduce:transition-none", DEVICE_WIDTH[device])}>
           {/* srcDoc inherits the studio origin, so the static mock gets no sandbox permissions at all. */}
           <WebPreviewBody sandbox="" srcDoc={GENERATED_APP_MOCK} title="Roastery Portal preview" />
         </div>

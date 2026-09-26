@@ -42,11 +42,12 @@ export function CostMeter({
         aria-label="Run cost against budget"
         aria-valuemin={0}
         aria-valuemax={budgetUsd}
-        aria-valuenow={spentUsd}
+        aria-valuenow={Math.min(spentUsd, budgetUsd)}
+        aria-valuetext={`${usd.format(spentUsd)} of ${usd.format(budgetUsd)}`}
         className="h-1 overflow-hidden rounded-full bg-muted"
       >
         <div
-          className={cn("h-full origin-left rounded-full transition-transform duration-300 ease-out", tone)}
+          className={cn("h-full origin-left rounded-full transition-transform duration-300 ease-out motion-reduce:transition-none", tone)}
           style={{ transform: `scaleX(${ratio})` }}
         />
       </div>

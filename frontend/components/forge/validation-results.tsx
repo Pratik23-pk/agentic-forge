@@ -30,9 +30,9 @@ export function ValidationResults({ results }: { results: ValidationPart[] }) {
         <TestResultsDuration />
       </TestResultsHeader>
       <TestResultsContent className="p-0">
-        {results.map((result) => (
+        {results.map((result, index) => (
           <Test
-            key={result.command}
+            key={`${result.name}-${index}`}
             name={result.name}
             status={result.passed ? "passed" : "failed"}
             duration={result.durationMs}
@@ -40,9 +40,10 @@ export function ValidationResults({ results }: { results: ValidationPart[] }) {
           />
         ))}
         {results
-          .filter((result) => !result.passed && result.excerpt)
-          .map((result) => (
-            <div key={`${result.command}-error`} className="border-t px-4 pb-3">
+          .map((result, index) => ({ result, index }))
+          .filter(({ result }) => !result.passed && result.excerpt)
+          .map(({ result, index }) => (
+            <div key={`${result.name}-${index}-error`} className="border-t px-4 pb-3">
               <TestError>
                 <TestErrorMessage>
                   <code>{result.command}</code> exited with an error

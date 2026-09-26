@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { FileTree, FileTreeFile, FileTreeFolder } from "@/components/ai-elements/file-tree";
 import { buildFileTree, type FileTreeNode } from "@/lib/file-tree";
 
@@ -28,13 +30,25 @@ function renderNodes(nodes: FileTreeNode[]) {
   );
 }
 
-/** Generated project files as a tree, expanded by default. */
+/**
+ * Generated project files as a tree. Folders are expanded by default,
+ * including folders that stream in later; only folders the user collapsed
+ * stay collapsed.
+ */
 export function ProjectFiles({ paths, selectedPath, onSelect, className }: ProjectFilesProps) {
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const tree = buildFileTree(paths);
+  const folders = allFolderPaths(tree);
+  const expanded = new Set(folders.filter((folder) => !collapsed.has(folder)));
+
   return (
     <FileTree
+      aria-label="Project files"
       className={className}
-      defaultExpanded={new Set(allFolderPaths(tree))}
+      expanded={expanded}
+      onExpandedChange={(next) =>
+        setCollapsed(new Set(folders.filter((folder) => !next.has(folder))))
+      }
       selectedPath={selectedPath}
       onSelect={onSelect}
     >

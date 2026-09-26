@@ -142,18 +142,15 @@ export const FileTreeFolder = ({
   children,
   ...props
 }: FileTreeFolderProps) => {
-  const { expandedPaths, togglePath, selectedPath, onSelect } =
+  const { expandedPaths, togglePath, selectedPath } =
     useContext(FileTreeContext);
   const isExpanded = expandedPaths.has(path);
   const isSelected = selectedPath === path;
 
+  // Folders expand and collapse; only files are selectable.
   const handleOpenChange = useCallback(() => {
     togglePath(path);
   }, [togglePath, path]);
-
-  const handleSelect = useCallback(() => {
-    onSelect?.(path);
-  }, [onSelect, path]);
 
   const folderContextValue = useMemo(
     () => ({ isExpanded, name, path }),
@@ -168,7 +165,6 @@ export const FileTreeFolder = ({
           aria-selected={isSelected}
           className={cn("", className)}
           role="treeitem"
-          tabIndex={0}
           {...props}
         >
           <div
@@ -179,20 +175,23 @@ export const FileTreeFolder = ({
           >
             <CollapsibleTrigger asChild>
               <button
+                aria-label={`${isExpanded ? "Collapse" : "Expand"} ${name}`}
                 className="flex shrink-0 cursor-pointer items-center border-none bg-transparent p-0"
+                tabIndex={-1}
                 type="button"
               >
                 <ChevronRightIcon
                   className={cn(
-                    "size-4 shrink-0 text-muted-foreground transition-transform",
+                    "size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out",
                     isExpanded && "rotate-90"
                   )}
                 />
               </button>
             </CollapsibleTrigger>
             <button
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-left"
-              onClick={handleSelect}
+              aria-expanded={isExpanded}
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-sm border-none bg-transparent p-0 text-left"
+              onClick={handleOpenChange}
               type="button"
             >
               <FileTreeIcon>
@@ -206,7 +205,9 @@ export const FileTreeFolder = ({
             </button>
           </div>
           <CollapsibleContent>
-            <div className="ml-3.5 border-l pl-1.5">{children}</div>
+            <div className="ml-3.5 border-l pl-1.5" role="group">
+              {children}
+            </div>
           </CollapsibleContent>
         </div>
       </Collapsible>
@@ -248,6 +249,7 @@ export const FileTreeFile = ({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
         onSelect?.(path);
       }
     },

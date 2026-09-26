@@ -36,6 +36,15 @@ describe("buildFileTree", () => {
     expect(tree[0].kind === "folder" && tree[0].children).toHaveLength(1);
   });
 
+  it("keeps the folder when a path is both a file and a folder, in either order", () => {
+    for (const paths of [["a", "a/b.ts"], ["a/b.ts", "a"]]) {
+      const tree = buildFileTree(paths);
+      expect(tree).toEqual([
+        { kind: "folder", name: "a", path: "a", children: [{ kind: "file", name: "b.ts", path: "a/b.ts" }] },
+      ]);
+    }
+  });
+
   it("returns an empty tree for no paths", () => {
     expect(buildFileTree([])).toEqual([]);
   });

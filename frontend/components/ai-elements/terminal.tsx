@@ -146,6 +146,7 @@ export const TerminalCopyButton = ({
         "size-7 shrink-0 text-muted-foreground hover:bg-accent hover:text-foreground",
         className
       )}
+      aria-label={isCopied ? "Copied" : "Copy output"}
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"
@@ -175,6 +176,7 @@ export const TerminalClearButton = ({
         "size-7 shrink-0 text-muted-foreground hover:bg-accent hover:text-foreground",
         className
       )}
+      aria-label="Clear output"
       onClick={onClear}
       size="icon"
       variant="ghost"

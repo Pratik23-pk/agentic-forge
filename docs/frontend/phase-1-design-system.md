@@ -364,7 +364,18 @@ motion emulated and keyboard focus checked.
   `srcDoc` previews get an empty sandbox because they inherit the studio origin.
 - **Not verified:** the Docker image (Docker was not running during implementation).
 
+### Review fixes
+
+A whole-branch review found no blockers; its confirmed findings were fixed before hand-off:
+folders no longer act as selectable files, icon-only buttons and test statuses have accessible
+names, the file tree has one tab stop per item and `role="group"` children, folders that stream
+in later start expanded, the highlight cache keys on full source, validation rows have unique
+keys, `CostMeter` clamps its ARIA value, remaining transitions respect reduced motion, and
+`CheckpointCard` resolves after a decision so it cannot be sent twice.
+
 ### Carry into Phase 3
+
+- File tree arrow-key navigation (roving tabindex per the WAI-ARIA tree pattern).
 
 - Real previews: keep `allow-scripts allow-same-origin` only for cross-origin sandbox URLs; the
   browser warns that the combination can escape the sandbox on same-origin content.
