@@ -75,6 +75,10 @@ def test_fullstack_preview_injects_allocated_frontend_cors_origin(
     (project / "backend").mkdir(parents=True)
     (project / "frontend").mkdir()
     (project / "backend" / "requirements.txt").write_text("fastapi==1", encoding="utf-8")
+    (project / "backend" / ".env.example").write_text(
+        "DATABASE_URL=\nJWT_SECRET=\nUPLOAD_DIR=\n",
+        encoding="utf-8",
+    )
     (project / "frontend" / "package.json").write_text("{}", encoding="utf-8")
     settings = Settings(
         app_env="test",
@@ -90,6 +94,9 @@ def test_fullstack_preview_injects_allocated_frontend_cors_origin(
 
     backend_environment = definitions[0][3]
     assert backend_environment["CORS_ORIGINS"] == ("http://127.0.0.1:5173,http://localhost:5173")
+    assert backend_environment["DATABASE_URL"].startswith("sqlite+pysqlite:////tmp/")
+    assert backend_environment["JWT_SECRET"].startswith("preview-only-not-a-real-secret")
+    assert backend_environment["UPLOAD_DIR"] == "/tmp/agentic-forge-media"
     frontend_environment = definitions[1][3]
     assert frontend_environment["VITE_API_BASE_URL"] == "http://127.0.0.1:5173"
 
@@ -291,6 +298,46 @@ def test_node_preview_image_repairs_lock_without_running_generated_build(
     assert "npm install --package-lock-only --ignore-scripts" in content
     assert "npm ci --ignore-scripts" in content
     assert "npm run build" not in content
+
+
+def test_python_preview_image_syncs_the_committed_uv_lock(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    manager = PreviewManager(
+        Settings(
+            app_env="test",
+            preview_cache_dir=tmp_path / "cache",
+            preview_sandbox_mode="docker",
+        )
+    )
+    component = tmp_path / "backend"
+    component.mkdir()
+    (component / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+    (component / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+    (component / ".python-version").write_text("3.11\n", encoding="utf-8")
+    service = manager._service("job-12345678", "backend", "backend", 8000, ["python"])
+    monkeypatch.setattr(
+        "software_developer_agent.sandbox.preview_manager.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+    monkeypatch.setattr(
+        "software_developer_agent.sandbox.preview_manager.PreviewManager._ensure_docker_network",
+        lambda self: None,
+    )
+
+    manager._build_docker_image("job-12345678", service, component)
+
+    dockerfile = tmp_path / "cache" / "job-12345678" / "backend-image" / "Dockerfile"
+    content = dockerfile.read_text(encoding="utf-8")
+    assert "ghcr.io/astral-sh/uv:0.12.18-debian-slim" in content
+    assert "uv sync --locked --no-dev --no-install-project --no-editable" in content
+    assert "uv sync --locked --no-dev --no-editable" in content
+    assert "UV_PYTHON_INSTALL_DIR=/opt/uv/python" in content
+    assert "UV_PROJECT_ENVIRONMENT=/opt/venv" in content
+    assert "PATH=/opt/venv/bin:$PATH" in content
+    assert "chmod -R a+rX /opt/uv /opt/venv" in content
+    assert "pip install" not in content
 
 
 def test_preview_waits_for_http_not_just_the_docker_proxy_port(tmp_path, monkeypatch) -> None:

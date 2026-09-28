@@ -22,6 +22,7 @@ from software_developer_agent.models.job_state import (
     WorkerResult,
 )
 from software_developer_agent.orchestration.repair_kernel import UniversalRepairKernel
+from software_developer_agent.tools.registry import ToolContext
 
 
 def _frontend_job() -> tuple[JobState, JobTask]:
@@ -770,6 +771,63 @@ class _ManifestRecoveryWorker(DeveloperWorker):
 
 class _BackendManifestRecoveryWorker(_ManifestRecoveryWorker):
     worker_kind = WorkerKind.BACKEND
+
+
+class _ToolRegistryStub:
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    def collect_context(self, task: JobTask) -> ToolContext:
+        self.call_count += 1
+        return ToolContext(
+            content="Stable media evidence.",
+            calls=[{"tool": "media_asset_acquisition", "status": "success"}],
+        )
+
+
+class _ToolContextWorker(_ManifestRecoveryWorker):
+    def __init__(self, outputs: list[str], settings: Settings, registry: _ToolRegistryStub) -> None:
+        DeveloperWorker.__init__(self, settings=settings, tool_registry=registry)
+        self._outputs = iter(outputs)
+        self.seen_contexts: list[str] = []
+
+    def execute(self, task: JobTask, tool_context: str = "") -> str:
+        self.seen_contexts.append(tool_context)
+        return next(self._outputs)
+
+
+def test_worker_reuses_checkpointed_tool_context_across_repairs() -> None:
+    task = JobTask(
+        worker_kind=WorkerKind.FRONTEND,
+        title="Frontend",
+        instructions="Build frontend.",
+        capability_id="react-vite",
+    )
+    candidate = json.dumps(
+        {
+            "summary": "valid candidate",
+            "operation": "replace",
+            "files": [
+                {"path": "frontend/index.html", "content": '<div id="root"></div>\n'},
+                {"path": "frontend/src/main.tsx", "content": "import './App';\n"},
+                {"path": "frontend/src/App.tsx", "content": "export {};\n"},
+                {"path": "frontend/src/App.test.tsx", "content": "export {};\n"},
+            ],
+        }
+    )
+    registry = _ToolRegistryStub()
+    worker = _ToolContextWorker(
+        [candidate, candidate],
+        Settings(app_env="test", enable_persistence=False),
+        registry,
+    )
+
+    worker.run(task)
+    worker.run(task)
+
+    assert registry.call_count == 1
+    assert worker.seen_contexts == ["Stable media evidence.", "Stable media evidence."]
+    assert task.tool_calls == [{"tool": "media_asset_acquisition", "status": "success"}]
 
 
 def test_malformed_manifest_recovery_does_not_consume_official_attempt() -> None:

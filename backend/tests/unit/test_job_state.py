@@ -17,7 +17,13 @@ from software_developer_agent.models.job_state import (
 
 def test_job_state_round_trips_tool_calls() -> None:
     job = JobState(request=JobRequest(prompt="Build a backend API"))
-    task = JobTask(worker_kind=WorkerKind.BACKEND, title="API", instructions="Implement API")
+    task = JobTask(
+        worker_kind=WorkerKind.BACKEND,
+        title="API",
+        instructions="Implement API",
+        tool_context="Verified documentation evidence.",
+        tool_calls=[{"tool": "search", "status": "success"}],
+    )
     job.tasks = [task]
     job.add_worker_result(
         WorkerResult(
@@ -33,6 +39,8 @@ def test_job_state_round_trips_tool_calls() -> None:
 
     assert restored.job_id == job.job_id
     assert restored.tasks[0].worker_kind == WorkerKind.BACKEND
+    assert restored.tasks[0].tool_context == "Verified documentation evidence."
+    assert restored.tasks[0].tool_calls[0]["status"] == "success"
     assert restored.worker_results[0].tool_calls[0]["tool"] == "search"
 
 
@@ -70,6 +78,11 @@ def test_job_state_round_trips_checkpointed_manifest_state() -> None:
     }
     job.verified_manifest_state = dict(job.manifest_state)
     job.verified_validation = {"passed": True, "release_ready": True}
+    job.project_explanation = {
+        "status": "ready",
+        "evidence_sha256": "abc123",
+        "guide": {"title": "Frontend guide"},
+    }
     job.manifest_transaction = {
         "base": {"revision": 2, "files": {}},
         "fingerprints": {"frontend": "abc"},
@@ -81,6 +94,7 @@ def test_job_state_round_trips_checkpointed_manifest_state() -> None:
     assert restored.manifest_state == job.manifest_state
     assert restored.verified_manifest_state == job.verified_manifest_state
     assert restored.verified_validation == job.verified_validation
+    assert restored.project_explanation == job.project_explanation
     assert restored.manifest_transaction == job.manifest_transaction
 
 

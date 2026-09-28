@@ -2,7 +2,7 @@
 
 ## Development
 
-- Backend: `uvicorn software_developer_agent.main:app --reload`
+- Backend: run `uv sync --project backend --locked --no-editable`, then `uv run --project backend --locked --no-sync uvicorn software_developer_agent.main:app --app-dir backend/src --reload`
 - Frontend: `npm run dev`
 - API docs: `http://localhost:8000/docs` in non-production environments
 
@@ -16,7 +16,9 @@
 
 - Enable or disable approval pauses with `ENABLE_HUMAN_CHECKPOINTS`.
 - Cap user interruptions with `MAX_HUMAN_CHECKPOINTS`; the default is 4.
-- Feedback approvals resume the next pending worker.
+- The first checkpoint approves scope, Standard/Advanced routing, uploaded-media counts, estimated cost,
+  and the maximum authorized spend before paid planning begins.
+- Feedback approvals resume the next pending graph stage.
 - Requested changes reset only the worker tied to the active checkpoint.
 - Approval-only resumes do not increment the worker execution-loop counter.
 - Automated packaging repairs do not repeatedly ask for visual approval.
@@ -83,14 +85,14 @@
 Offline structural benchmark:
 
 ```bash
-PYTHONPATH=backend/src backend/.venv/bin/python \
+uv run --project backend --locked --no-sync python \
   -m software_developer_agent.benchmarks.runner --repeat 2
 ```
 
 Execution-grade benchmark:
 
 ```bash
-PYTHONPATH=backend/src backend/.venv/bin/python \
+uv run --project backend --locked --no-sync python \
   -m software_developer_agent.benchmarks.runner --execute --repeat 1
 ```
 
@@ -110,10 +112,40 @@ network-enabled isolated worker.
 For local development, use the `redis` service in `docker-compose.yml`.
 For managed production Redis, use Upstash first. Move to AWS ElastiCache only when VPC-local networking or heavier queue throughput is needed.
 
+## Media Assets
+
+- The studio accepts multiple JPEG, PNG, GIF, WebP, MP4, WebM, and Ogg prompt attachments. It also
+  records a voice prompt, transcribes it through the backend, and inserts editable text without
+  automatically submitting the job.
+- Uploaded media is stored under the temporary upload cache with immutable IDs and file hashes. The
+  planner passes only safe project paths and metadata to workers; raw cache paths never enter output.
+- Prompts that explicitly request displayed images or videos activate the media acquisition tool.
+- Serper supplies source candidates. The frontend worker receives permitted local-download and
+  remote/embed options and must use the exact supplied URL or project asset path.
+- Downloads are restricted to public HTTP(S) destinations, approved image/video MIME types, bounded
+  redirects, validated file signatures, and the configured byte limits.
+- Selected downloads are copied into `frontend/public/assets/media/`; selected sources and usage
+  strategies are recorded in `artifacts/media-assets.json`.
+- Source terms and attribution remain mandatory. Ordinary streaming-page URLs are never treated as
+  downloadable media, and supported YouTube/Vimeo pages are converted only to embed URLs.
+- Search downloads survive repair attempts and may be reacquired after a full replan. User uploads
+  survive replans and human pauses. Both caches are removed after terminal success, failure, or block;
+  selected copies remain in the generated folder and ZIP.
+
+## Generation Profiles and Cost
+
+- `auto` performs deterministic preflight and recommends Standard or Advanced before approval.
+- `standard` is limited by `MAXIMUM_RUN_BUDGET_USD`, which defaults to `$1.00`.
+- `advanced` accepts an upfront ceiling no greater than `MAXIMUM_ADVANCED_RUN_BUDGET_USD`.
+- Advanced authorization does not force higher spend. It enables stronger planning/design and protects
+  sufficient completion and repair reserves when complexity justifies them.
+- The Global Cost Ledger stores the selected profile, authorized ceiling, actual token usage, and
+  per-node cost. A run pauses or packages its last runnable checkpoint rather than spending past the cap.
+
 ## Generated Artifacts
 
 Workers must produce structured file manifests inside their owned component paths. The artifact
-writer assembles them in staging, creates the npm lockfile, runs structural and executable
+writer assembles them in staging, materializes uv and npm lockfiles, runs structural and executable
 validation, verifies ZIP parity, and publishes atomically only after every gate passes. Tests/builds
 and dependency audits are separate validation phases. Audit infrastructure failures never request a
 code repair: the executable project remains previewable and downloadable as a provisional release,

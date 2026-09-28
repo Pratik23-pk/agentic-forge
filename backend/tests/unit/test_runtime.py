@@ -165,6 +165,70 @@ def test_runtime_pauses_and_resumes_for_human_feedback() -> None:
     assert job.loop_count == 1
 
 
+def test_human_checkpoints_are_not_published_before_graph_quiescence() -> None:
+    settings = Settings(
+        app_env="test",
+        enable_llm_calls=False,
+        enable_human_checkpoints=True,
+        max_human_checkpoints=2,
+        max_worker_attempts=2,
+        max_total_attempts=4,
+    )
+    runtime = AgentRuntime(settings=settings)
+    job = JobState(request=JobRequest(prompt="Build a frontend dashboard"))
+    progress: list[dict] = []
+    runtime.set_progress_callback(lambda current: progress.append(current.to_dict()))
+
+    runtime.run_to_completion(job)
+
+    assert job.active_feedback_request() is not None
+    assert job.active_feedback_request().gate == ApprovalGate.PRODUCT_CONTRACT
+    assert all(snapshot["active_feedback_request_id"] is None for snapshot in progress)
+
+    runtime.apply_human_feedback(job, HumanFeedbackDecision.APPROVE)
+    progress.clear()
+    runtime.run_to_completion(job)
+
+    assert job.active_feedback_request() is not None
+    assert job.active_feedback_request().gate == ApprovalGate.RELEASE
+    assert all(snapshot["active_feedback_request_id"] is None for snapshot in progress)
+
+
+def test_release_approval_resumes_at_finalization_without_re_evaluation() -> None:
+    settings = Settings(
+        app_env="test",
+        enable_llm_calls=False,
+        enable_human_checkpoints=True,
+        max_human_checkpoints=2,
+    )
+    runtime = AgentRuntime(settings=settings)
+    original_evaluate = runtime._evaluator.evaluate
+    runtime._evaluator.evaluate = Mock(wraps=original_evaluate)
+    job = JobState(request=JobRequest(prompt="Build a frontend dashboard"))
+
+    runtime.run_to_completion(job)
+    runtime.apply_human_feedback(job, HumanFeedbackDecision.APPROVE)
+    runtime.run_to_completion(job)
+    assert runtime._evaluator.evaluate.call_count == 1
+
+    runtime.apply_human_feedback(job, HumanFeedbackDecision.APPROVE)
+    job.release_status = ReleaseStatus.QUARANTINED
+    job.evaluation = EvaluationResult(
+        passed=False,
+        retry_targets=[WorkerKind.FRONTEND],
+        failure_reason="Stale replay result must not replace the approved release.",
+    )
+    job.errors.append("Stale replay failure.")
+    route = runtime.run_to_completion(job)
+
+    assert route.action == RouteAction.SUCCESS
+    assert job.status == JobStatus.SUCCEEDED
+    assert job.release_status == ReleaseStatus.VERIFIED
+    assert job.evaluation is not None and job.evaluation.passed
+    assert job.errors == []
+    assert runtime._evaluator.evaluate.call_count == 1
+
+
 def test_automatic_replan_has_separate_single_use_budget() -> None:
     runtime = AgentRuntime(
         Settings(

@@ -78,6 +78,8 @@ class JobTask:
     capability_id: str = "react-fastapi"
     adapter_ids: list[str] = field(default_factory=list)
     retry_context: str | None = None
+    tool_context: str | None = None
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     transport_attempts: int = 0
     repair_rejections: int = 0
 
@@ -192,8 +194,10 @@ class JobState:
     job_id: str = field(default_factory=lambda: str(uuid4()))
     status: JobStatus = JobStatus.PENDING
     request_policy: dict[str, Any] = field(default_factory=dict)
+    preflight: dict[str, Any] = field(default_factory=dict)
     project_spec: dict[str, Any] = field(default_factory=dict)
     design_spec: dict[str, Any] = field(default_factory=dict)
+    project_explanation: dict[str, Any] = field(default_factory=dict)
     approval_state: dict[str, Any] = field(default_factory=dict)
     cost_ledger: dict[str, Any] = field(default_factory=dict)
     api_contract: dict[str, Any] = field(default_factory=dict)
@@ -322,8 +326,10 @@ def job_state_from_dict(payload: dict[str, Any]) -> JobState:
         job_id=payload.get("job_id", str(uuid4())),
         status=JobStatus(payload.get("status", JobStatus.PENDING.value)),
         request_policy=dict(payload.get("request_policy", {})),
+        preflight=dict(payload.get("preflight", {})),
         project_spec=dict(payload.get("project_spec", {})),
         design_spec=dict(payload.get("design_spec", {})),
+        project_explanation=dict(payload.get("project_explanation", {})),
         approval_state=dict(payload.get("approval_state", {})),
         cost_ledger=dict(payload.get("cost_ledger", {})),
         api_contract=dict(payload.get("api_contract", {})),
@@ -361,6 +367,8 @@ def job_state_from_dict(payload: dict[str, Any]) -> JobState:
             capability_id=item.get("capability_id", "react-fastapi"),
             adapter_ids=list(item.get("adapter_ids", [])),
             retry_context=item.get("retry_context"),
+            tool_context=item.get("tool_context"),
+            tool_calls=list(item.get("tool_calls", [])),
             transport_attempts=item.get("transport_attempts", 0),
             repair_rejections=item.get("repair_rejections", 0),
         )

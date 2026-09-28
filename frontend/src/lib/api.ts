@@ -13,6 +13,68 @@ export type ReleaseStatus = "pending" | "verified" | "provisional" | "quarantine
 export type TaskStatus = "pending" | "running" | "succeeded" | "failed" | "skipped";
 
 export type WorkerKind = "database" | "backend" | "frontend";
+export type GenerationProfile = "auto" | "standard" | "advanced";
+export type ProjectExplanationStatus =
+  | "not_started"
+  | "queued"
+  | "generating"
+  | "ready"
+  | "failed"
+  | "unavailable";
+
+export interface ProjectExplanationMessage {
+  message_id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations: string[];
+  refusal: boolean;
+  cached: boolean;
+  cost_usd: number;
+  created_at: string;
+}
+
+export interface ProjectExplanation {
+  status: ProjectExplanationStatus;
+  version?: string;
+  evidence_sha256?: string;
+  model?: string;
+  mode?: "read_only_conversation";
+  prompt_limit?: number;
+  prompt_count?: number;
+  remaining_prompts?: number;
+  budget_limit_usd?: number;
+  spent_usd?: number;
+  messages?: ProjectExplanationMessage[];
+  error?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProjectGuideResponse {
+  job_id: string;
+  project_id: string;
+  build_status: JobStatus;
+  release_status: ReleaseStatus;
+  explanation: ProjectExplanation;
+}
+
+export interface UploadedMediaAsset {
+  asset_id: string;
+  kind: "image" | "video";
+  filename: string;
+  mime_type: string;
+  bytes: number;
+  sha256: string;
+  status: string;
+}
+
+export interface TranscriptionResult {
+  transcript: string;
+  receipt_id: string;
+  duration_seconds: number;
+  estimated_cost_usd: number;
+  model: string;
+}
 
 export type HumanFeedbackStatus =
   | "pending"
@@ -111,6 +173,16 @@ export interface JobState {
     project_id: string;
     metadata: Record<string, unknown>;
   };
+  preflight: {
+    requested_profile?: GenerationProfile;
+    recommended_profile?: "standard" | "advanced";
+    effective_profile?: "standard" | "advanced";
+    authorized_budget_usd?: number;
+    estimated_cost_usd?: { minimum: number; maximum: number };
+    complexity_score?: number;
+    uploaded_media?: { images: number; videos: number };
+    warnings?: string[];
+  };
   project_spec: {
     capability_id: string;
     application_type: string;
@@ -122,6 +194,7 @@ export interface JobState {
     acceptance_criteria: string[];
   };
   design_spec: Record<string, unknown>;
+  project_explanation: ProjectExplanation;
   approval_state: {
     revision?: number;
     gates?: Record<string, {
@@ -293,12 +366,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    if (response.status === 502 || response.status === 503) {
-      throw new Error(
-        "The Agentic Forge backend is unavailable. Start it with ./scripts/run_backend.sh, then retry."
-      );
+    let detail: string | undefined;
+    try {
+      const payload = JSON.parse(errorText) as { detail?: string | { message?: string } };
+      if (typeof payload.detail === "string") {
+        detail = payload.detail;
+      }
+      if (
+        payload.detail &&
+        typeof payload.detail === "object" &&
+        payload.detail.message
+      ) {
+        detail = payload.detail.message;
+      }
+    } catch {
     }
-    throw new Error(errorText || `Request failed with ${response.status}`);
+    throw new Error(detail || errorText || `Request failed with ${response.status}`);
   }
 
   return response.json() as Promise<T>;
@@ -308,7 +391,9 @@ export function submitJob(
   prompt: string,
   projectId: string,
   runImmediately: boolean,
-  capabilityId?: string
+  capabilityId?: string,
+  generationProfile: GenerationProfile = "auto",
+  uploadAssetIds: string[] = []
 ): Promise<JobState> {
   return request<JobState>("/api/jobs", {
     method: "POST",
@@ -316,9 +401,52 @@ export function submitJob(
       prompt,
       project_id: projectId,
       run_immediately: runImmediately,
+      generation_profile: generationProfile,
+      upload_asset_ids: uploadAssetIds,
       metadata: capabilityId ? { capability_id: capabilityId } : {}
     })
   });
+}
+
+export async function uploadMedia(files: File[]): Promise<UploadedMediaAsset[]> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  const response = await fetch(`${apiBase}/api/media/uploads`, {
+    method: "POST",
+    body: formData
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || `Upload failed with ${response.status}`);
+  }
+  const payload = (await response.json()) as { assets: UploadedMediaAsset[] };
+  return payload.assets;
+}
+
+export async function deleteUploadedMedia(assetId: string): Promise<void> {
+  const response = await fetch(`${apiBase}/api/media/uploads/${encodeURIComponent(assetId)}`, {
+    method: "DELETE"
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error((await response.text()) || `Delete failed with ${response.status}`);
+  }
+}
+
+export async function transcribeVoice(
+  audio: Blob,
+  durationSeconds: number
+): Promise<TranscriptionResult> {
+  const formData = new FormData();
+  const extension = audio.type.includes("ogg") ? "ogg" : audio.type.includes("mp4") ? "m4a" : "webm";
+  formData.append("audio", audio, `voice-prompt.${extension}`);
+  formData.append("duration_seconds", String(Math.max(durationSeconds, 0.1)));
+  const response = await fetch(`${apiBase}/api/media/transcriptions`, {
+    method: "POST",
+    body: formData
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || `Transcription failed with ${response.status}`);
+  }
+  return response.json() as Promise<TranscriptionResult>;
 }
 
 export function runNextJob(): Promise<JobState | { status: "idle" }> {
@@ -330,11 +458,12 @@ export function runNextJob(): Promise<JobState | { status: "idle" }> {
 export function submitHumanFeedback(
   jobId: string,
   decision: HumanFeedbackDecision,
-  message?: string
+  message?: string,
+  checkpointId?: string
 ): Promise<JobState> {
   return request<JobState>(`/api/jobs/${jobId}/feedback`, {
     method: "POST",
-    body: JSON.stringify({ decision, message })
+    body: JSON.stringify({ decision, message, checkpoint_id: checkpointId })
   });
 }
 
@@ -344,6 +473,26 @@ export function listJobs(): Promise<JobState[]> {
 
 export function getJob(jobId: string): Promise<JobState> {
   return request<JobState>(`/api/jobs/${jobId}`);
+}
+
+export function getProjectGuide(jobId: string): Promise<ProjectGuideResponse> {
+  return request<ProjectGuideResponse>(`/api/jobs/${jobId}/guide`);
+}
+
+export function initializeProjectExplainer(jobId: string): Promise<ProjectGuideResponse> {
+  return request<ProjectGuideResponse>(`/api/jobs/${jobId}/guide`, {
+    method: "POST"
+  });
+}
+
+export function askProjectExplainer(
+  jobId: string,
+  question: string
+): Promise<ProjectGuideResponse> {
+  return request<ProjectGuideResponse>(`/api/jobs/${jobId}/guide/messages`, {
+    method: "POST",
+    body: JSON.stringify({ question })
+  });
 }
 
 export function listGeneratedFiles(jobId: string): Promise<GeneratedFileList> {

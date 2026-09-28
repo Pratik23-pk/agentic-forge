@@ -85,7 +85,10 @@ Every generated application must have:
 - validation commands;
 - no files or services outside the requested scope.
 
-Require dependency manifests and documentation to agree. If the backend uses pyproject.toml, the README must use pyproject.toml installation commands. If the README uses requirements.txt, requirements.txt must be generated.
+Require dependency manifests and documentation to agree. Python projects use uv. Prefer
+pyproject.toml plus a uv-generated uv.lock and document `uv sync --locked --no-editable`. Accept requirements.txt
+only for an existing compatibility stack, and document `uv venv` plus `uv pip install -r` for it.
+Workers must never invent uv.lock content; the platform materializes and verifies lockfiles.
 
 Prefer small, testable tasks with explicit dependencies. Do not ask the user questions unless progress is impossible because of missing secrets or irreversible risk."""
 
@@ -210,9 +213,11 @@ The backend must include:
 - environment example only when configuration is needed;
 - accurate local setup and run instructions.
 
-Use exactly one documented Python dependency strategy:
-- pyproject.toml with `pip install -e .`; or
-- requirements.txt with `pip install -r requirements.txt`.
+Use exactly one documented uv-managed Python dependency strategy:
+- preferably pyproject.toml with test tooling in `[dependency-groups]` and
+  `uv sync --locked --no-editable`; or
+- requirements.txt only when required by an existing compatibility stack, installed with `uv venv`
+  and `uv pip install -r requirements.txt`.
 
 Use `backend/src/app` only with an installable pyproject.toml package. With requirements.txt, place
 the importable application at `backend/app` (or `backend/main.py`) so startup works from the backend
@@ -359,8 +364,22 @@ importable, guard the root element before calling createRoot so test and server-
 cannot fail before test collection.
 
 Hardcoded visual assets required for the first screen should be project-local or self-contained so the
-isolated no-egress preview remains complete. Verified image URLs from tool evidence may be used when
-the source is recorded in the interface or notes and the layout provides a polished fallback surface.
+isolated no-egress preview remains complete. Media tool evidence can contain both a downloaded
+`web_path` and a permitted remote or embed URL. Select exactly one listed option for each asset; never
+invent, rewrite, or guess media URLs. Prefer a downloaded `web_path` for critical first-screen and
+offline-safe content. Use a remote image URL or standards-based video embed only when source terms
+permit it and the product benefits from externally hosted or current media. Record the source visibly
+or in product notes, preserve any required attribution, and provide a polished loading/error fallback.
+The user media manifest contains uploads supplied with the generation prompt. Treat those paths as
+trusted project inputs, not as a reason to suppress useful web research. Use uploaded, downloaded, and
+embedded assets together whenever the request benefits from that combination. Never expose temporary
+cache paths, and never claim an uploaded asset was web-sourced.
+When tool evidence supplies both an external URL and a downloaded `web_path`, an external-media
+implementation must fall back to that local path after a load or playback failure instead of leaving a
+broken surface.
+For videos, use `<video controls>` for downloaded or direct media and an accessible titled iframe only
+for a verified embed URL. Never place an ordinary video page URL in a `<video>` source, silently
+download from a streaming platform, autoplay audible media, or depend on a poster as if it were video.
 When the request positively requires images, video, audio, maps, charts, or other visual media,
 implement actual accessible media or project-local assets. Decorative glyphs, emoji, empty gradients,
 and descriptive text do not satisfy an explicit media requirement.
@@ -517,10 +536,11 @@ Dependency rules:
 - Every runtime must have a valid dependency manifest.
 - Documentation must use the generated dependency manifest.
 - Never reference requirements.txt unless it exists.
+- Python installation, execution, and test commands must use uv; never emit pip or python -m venv.
 - Never use `latest` dependency versions.
 - Pin direct Python dependencies with `==` and npm dependencies with exact versions.
-- Include a package-manager lockfile when supported.
-- Materialize package-manager lockfiles with the package manager; never ask a worker to invent them.
+- Include a package-manager lockfile when supported. The platform materializes uv.lock and npm
+  lockfiles after workers return; workers must never invent lockfile contents.
 - Keep runtime versions consistent across manifests, documentation, tests, and optional container files.
 
 README requirements:

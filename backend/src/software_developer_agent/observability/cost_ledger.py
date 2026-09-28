@@ -37,6 +37,7 @@ class GlobalCostLedger:
     """Persists model usage and enforces normal and repair dollar ceilings."""
 
     def __init__(self, settings: Settings) -> None:
+        self._settings = settings
         self._normal_limit = settings.normal_run_budget_usd
         self._hard_limit = settings.maximum_run_budget_usd
         self._max_calls_per_node = settings.max_llm_calls_per_node
@@ -44,10 +45,23 @@ class GlobalCostLedger:
     def initialize(self, job: JobState) -> None:
         if job.cost_ledger:
             return
+        profile = str(job.preflight.get("effective_profile", "standard"))
+        authorized_limit = float(job.preflight.get("authorized_budget_usd", self._hard_limit))
+        hard_limit = min(
+            authorized_limit,
+            (
+                self._settings.maximum_advanced_run_budget_usd
+                if profile == "advanced"
+                else self._hard_limit
+            ),
+        )
+        normal_limit = hard_limit if profile == "advanced" else min(self._normal_limit, hard_limit)
         job.cost_ledger = {
             "currency": "USD",
-            "normal_limit_usd": self._normal_limit,
-            "hard_limit_usd": self._hard_limit,
+            "generation_profile": profile,
+            "normal_limit_usd": normal_limit,
+            "hard_limit_usd": hard_limit,
+            "authorized_limit_usd": hard_limit,
             "budget_phase": "normal",
             "spent_usd": 0.0,
             "prompt_tokens": 0,
@@ -85,7 +99,9 @@ class GlobalCostLedger:
             "completion_reserve",
             "repair",
         }
-        limit = self._hard_limit if elevated_phase else self._normal_limit
+        normal_limit = float(job.cost_ledger.get("normal_limit_usd", self._normal_limit))
+        hard_limit = float(job.cost_ledger.get("hard_limit_usd", self._hard_limit))
+        limit = hard_limit if elevated_phase else normal_limit
         spent = float(job.cost_ledger.get("spent_usd", 0.0))
         reserved_prompt_tokens = ceil(estimated_prompt_tokens * PROMPT_ESTIMATE_SAFETY_FACTOR)
         estimated_input = reserved_prompt_tokens / 1_000_000 * price.input_per_million
@@ -98,11 +114,11 @@ class GlobalCostLedger:
             and node.startswith("worker.")
             and len(job.tasks) >= 2
             and affordable_output < minimum_worker_output
-            and self._hard_limit > self._normal_limit
+            and hard_limit > normal_limit
         ):
             job.cost_ledger["budget_phase"] = "completion_reserve"
             job.touch()
-            limit = self._hard_limit
+            limit = hard_limit
             budget_reserve = max(limit * BUDGET_RESERVE_RATIO, 0.002)
             remaining = limit - budget_reserve - spent - estimated_input
             affordable_output = floor(
@@ -160,7 +176,8 @@ class GlobalCostLedger:
 
     def hard_limit_reached(self, job: JobState) -> bool:
         self.initialize(job)
-        return float(job.cost_ledger.get("spent_usd", 0.0)) >= self._hard_limit
+        hard_limit = float(job.cost_ledger.get("hard_limit_usd", self._hard_limit))
+        return float(job.cost_ledger.get("spent_usd", 0.0)) >= hard_limit
 
 
 def _price_for_model(model: str) -> ModelPrice:

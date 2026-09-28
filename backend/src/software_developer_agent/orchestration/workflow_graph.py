@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 
 class WorkflowGraphState(TypedDict, total=False):
     job: dict[str, Any]
+    resume_node: str
     retry_targets: list[str] | None
     repair_registered: bool
     next_action: str
@@ -16,6 +17,8 @@ class WorkflowGraphState(TypedDict, total=False):
 
 class WorkflowGraphHandlers(Protocol):
     def graph_guardrails(self, state: WorkflowGraphState) -> dict[str, Any]: ...
+
+    def graph_preflight(self, state: WorkflowGraphState) -> dict[str, Any]: ...
 
     def graph_plan(self, state: WorkflowGraphState) -> dict[str, Any]: ...
 
@@ -48,6 +51,7 @@ class WorkflowGraphHandlers(Protocol):
 
 WORKFLOW_NODE_NAMES = (
     "guardrails",
+    "preflight",
     "plan",
     "design",
     "product_approval",
@@ -68,6 +72,7 @@ WORKFLOW_NODE_NAMES = (
 def build_workflow_graph(handlers: WorkflowGraphHandlers, checkpointer, store):
     builder = StateGraph(WorkflowGraphState)
     builder.add_node("guardrails", handlers.graph_guardrails)
+    builder.add_node("preflight", handlers.graph_preflight)
     builder.add_node("plan", handlers.graph_plan)
     builder.add_node("design", handlers.graph_design)
     builder.add_node("product_approval", handlers.graph_product_approval)
@@ -83,19 +88,24 @@ def build_workflow_graph(handlers: WorkflowGraphHandlers, checkpointer, store):
     builder.add_node("finalize_success", handlers.graph_finalize_success)
     builder.add_node("finalize_failure", handlers.graph_finalize_failure)
 
-    builder.add_edge(START, "guardrails")
+    builder.add_conditional_edges(
+        START,
+        _entry_node,
+        {"guardrails": "guardrails", "finalize_success": "finalize_success"},
+    )
     builder.add_conditional_edges(
         "guardrails",
+        _continue_or_end,
+        {"continue": "preflight", "end": END},
+    )
+    builder.add_edge("preflight", "product_approval")
+    builder.add_conditional_edges(
+        "product_approval",
         _continue_or_end,
         {"continue": "plan", "end": END},
     )
     builder.add_edge("plan", "design")
-    builder.add_edge("design", "product_approval")
-    builder.add_conditional_edges(
-        "product_approval",
-        _continue_or_end,
-        {"continue": "privileged_approval", "end": END},
-    )
+    builder.add_edge("design", "privileged_approval")
     builder.add_conditional_edges(
         "privileged_approval",
         _continue_or_end,
@@ -133,6 +143,14 @@ def build_workflow_graph(handlers: WorkflowGraphHandlers, checkpointer, store):
     builder.add_edge("finalize_success", END)
     builder.add_edge("finalize_failure", END)
     return builder.compile(checkpointer=checkpointer, store=store)
+
+
+def _entry_node(
+    state: WorkflowGraphState,
+) -> Literal["guardrails", "finalize_success"]:
+    if state.get("resume_node") == "finalize_success":
+        return "finalize_success"
+    return "guardrails"
 
 
 def _continue_or_end(state: WorkflowGraphState) -> Literal["continue", "end"]:

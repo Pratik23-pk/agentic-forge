@@ -6,15 +6,15 @@ from software_developer_agent.artifacts.file_manifest import (
     normalize_worker_manifest,
     validate_worker_manifest_contract,
     validate_worker_manifest_scope,
-    worker_manifest_source_syntax_failure,
     worker_file_manifest_json,
     worker_manifest_prompt,
+    worker_manifest_source_syntax_failure,
 )
 from software_developer_agent.config.settings import Settings
 from software_developer_agent.integrations.llm_client import LLMClient
 from software_developer_agent.models.job_state import JobTask, TaskStatus, WorkerKind, WorkerResult
 from software_developer_agent.prompts.system_prompts import get_worker_system_prompt
-from software_developer_agent.tools.registry import ToolRegistry
+from software_developer_agent.tools.registry import ToolContext, ToolRegistry
 
 
 class DeveloperWorker(ABC):
@@ -38,10 +38,18 @@ class DeveloperWorker(ABC):
         candidate_attempt = task.attempt + 1
         original_instructions = task.instructions
         if self._tool_registry is not None:
-            try:
-                tool_context = self._tool_registry.collect_context(task)
-            except Exception as exc:
-                errors.append(f"Tool context failed: {exc}")
+            if task.tool_context is not None:
+                tool_context = ToolContext(
+                    content=task.tool_context,
+                    calls=list(task.tool_calls),
+                )
+            else:
+                try:
+                    tool_context = self._tool_registry.collect_context(task)
+                    task.tool_context = tool_context.content
+                    task.tool_calls = list(tool_context.calls)
+                except Exception as exc:
+                    errors.append(f"Tool context failed: {exc}")
         recovery_attempts = self._settings.max_manifest_recovery_attempts if self._settings else 0
         for recovery_index in range(recovery_attempts + 1):
             task.transport_attempts += 1

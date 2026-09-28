@@ -34,9 +34,14 @@ class Settings(BaseSettings):
     openai_evaluator_model: str = "gpt-5.6-luna"
     openai_visual_evaluator_model: str = "gpt-5.6-terra"
     openai_artifact_model: str = "gpt-5.6-luna"
+    openai_explainer_model: str = "gpt-6-luna"
     openai_embedding_model: str = "text-embedding-3-small"
+    openai_transcription_model: str = "gpt-4o-mini-transcribe"
+    transcription_cost_per_minute_usd: float = Field(default=0.003, ge=0)
     normal_run_budget_usd: float = Field(default=0.25, gt=0)
     maximum_run_budget_usd: float = Field(default=1.0, gt=0, le=1.0)
+    default_advanced_run_budget_usd: float = Field(default=1.5, gt=0)
+    maximum_advanced_run_budget_usd: float = Field(default=5.0, gt=1.0, le=25.0)
 
     supabase_url: str | None = None
     supabase_anon_key: SecretStr | None = None
@@ -76,10 +81,47 @@ class Settings(BaseSettings):
     artifact_validation_sandbox_mode: Literal["local", "docker"] = "docker"
     max_search_results: int = Field(default=5, ge=1, le=10)
     max_browser_pages: int = Field(default=3, ge=0, le=10)
+    max_media_assets: int = Field(default=3, ge=1, le=8)
+    max_image_download_bytes: int = Field(default=12_000_000, ge=100_000, le=50_000_000)
+    max_video_download_bytes: int = Field(
+        default=64_000_000,
+        ge=1_000_000,
+        le=250_000_000,
+    )
+    max_user_media_assets: int = Field(default=8, ge=1, le=24)
+    max_user_image_upload_bytes: int = Field(
+        default=20_000_000,
+        ge=100_000,
+        le=100_000_000,
+    )
+    max_user_video_upload_bytes: int = Field(
+        default=250_000_000,
+        ge=1_000_000,
+        le=1_000_000_000,
+    )
+    max_voice_recording_bytes: int = Field(
+        default=25_000_000,
+        ge=100_000,
+        le=100_000_000,
+    )
+    max_voice_recording_seconds: int = Field(default=600, ge=5, le=3600)
+    explainer_max_input_chars: int = Field(default=60_000, ge=10_000, le=200_000)
+    explainer_chat_context_chars: int = Field(default=6_000, ge=3_000, le=20_000)
+    explainer_max_question_chars: int = Field(default=2_000, ge=200, le=10_000)
+    explainer_max_output_tokens: int = Field(default=500, ge=96, le=1_000)
+    explainer_prompt_limit: int = Field(default=10, ge=1, le=10)
+    explainer_budget_usd: float = Field(default=0.01, gt=0, le=0.01)
+    explainer_per_prompt_budget_usd: float = Field(default=0.001, gt=0, le=0.001)
     max_human_checkpoints: int = Field(default=4, ge=0, le=8)
     artifacts_dir: Path = Path(__file__).resolve().parents[4] / "artifacts"
     generated_projects_dir: Path = Path(__file__).resolve().parents[4] / "generated-projects"
     preview_cache_dir: Path = Path(__file__).resolve().parents[4] / ".agentic-forge" / "previews"
+    media_cache_dir: Path = (
+        Path(__file__).resolve().parents[4] / ".agentic-forge" / "media-cache"
+    )
+    upload_cache_dir: Path = (
+        Path(__file__).resolve().parents[4] / ".agentic-forge" / "upload-cache"
+    )
     preview_host: str = "127.0.0.1"
     preview_port_start: int = Field(default=4100, ge=1024, le=65_000)
     preview_port_end: int = Field(default=4199, ge=1024, le=65_535)
@@ -99,6 +141,7 @@ class Settings(BaseSettings):
     enable_langgraph_checkpointing: bool = True
     enable_web_search: bool = False
     enable_browser: bool = False
+    enable_media_downloads: bool = True
     enable_artifact_generation: bool = True
     enable_artifact_validation: bool = True
     enable_domain_adapter_validation: bool = True
@@ -107,6 +150,7 @@ class Settings(BaseSettings):
     enable_browser_editor: bool = True
     enable_collaboration: bool = True
     enable_provider_actions: bool = False
+    enable_project_explainer: bool = True
 
 
 @lru_cache

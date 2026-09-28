@@ -9,6 +9,7 @@ from software_developer_agent.mcp.server import SecureMCPServer
 from software_developer_agent.mcp.types import MCPToolDefinition, MCPToolRequest, MCPToolResponse
 from software_developer_agent.models.job_state import WorkerKind
 from software_developer_agent.tools.browser import PlaywrightBrowserTool
+from software_developer_agent.tools.media_assets import MediaAssetPipeline
 from software_developer_agent.tools.policy import ToolPolicy
 from software_developer_agent.tools.serper_search import SerperSearchTool
 from software_developer_agent.tools.types import ToolResult
@@ -21,6 +22,7 @@ def build_development_mcp_server(settings: Settings) -> SecureMCPServer:
     policy = ToolPolicy.from_settings(settings)
     search_tool = SerperSearchTool(settings)
     browser_tool = PlaywrightBrowserTool(settings, policy)
+    media_pipeline = MediaAssetPipeline(settings, policy, search_tool)
 
     server.register(
         MCPToolDefinition(
@@ -49,6 +51,36 @@ def build_development_mcp_server(settings: Settings) -> SecureMCPServer:
         ),
         lambda request: _from_tool_result(
             search_tool.search_images(_string_input(request, "query"))
+        ),
+    )
+    server.register(
+        MCPToolDefinition(
+            name="serper_video_search",
+            description="Find relevant videos and their source pages through Serper.",
+            allowed_workers={WorkerKind.FRONTEND},
+            requires_network=True,
+        ),
+        lambda request: _from_tool_result(
+            search_tool.search_videos(_string_input(request, "query"))
+        ),
+    )
+    server.register(
+        MCPToolDefinition(
+            name="media_asset_acquisition",
+            description=(
+                "Prepare verified local-download and remote/embed options for requested images "
+                "or videos."
+            ),
+            allowed_workers={WorkerKind.FRONTEND},
+            requires_network=True,
+        ),
+        lambda request: _from_tool_result(
+            media_pipeline.acquire(
+                _string_input(request, "query"),
+                _media_kind_input(request),
+                _string_input(request, "task_id"),
+                _string_input(request, "instructions"),
+            )
         ),
     )
     server.register(
@@ -87,6 +119,13 @@ def _from_tool_result(result: ToolResult) -> MCPToolResponse:
         content=result.content,
         metadata=result.metadata,
     )
+
+
+def _media_kind_input(request: MCPToolRequest) -> str:
+    value = _string_input(request, "kind")
+    if value not in {"image", "video"}:
+        raise ValueError("Media kind must be image or video.")
+    return value
 
 
 def _database_schema_diagram(request: MCPToolRequest) -> MCPToolResponse:

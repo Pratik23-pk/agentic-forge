@@ -14,22 +14,26 @@ and downloadable software project while preserving human control over sensitive 
 | --- | --- |
 | Studio | React 18, TypeScript, Vite |
 | Control plane | FastAPI, Pydantic, background job execution |
+| Python packaging | uv with committed lockfiles and exact environment sync |
 | Orchestration | LangGraph parent workflow and repair subgraph |
 | Models | Configurable OpenAI role routing with per-run cost controls |
 | Persistence | Supabase/PostgreSQL with LangGraph checkpoints and Store |
 | Queue | In-memory queue or optional Redis |
-| Tooling | MCP boundary, Serper search, Playwright browser automation |
+| Tooling | MCP boundary, Serper search, safe image/video acquisition, Playwright automation |
 | Validation | Deterministic capability adapters, tests, builds, audits, browser checks |
 | Preview | Docker-isolated generated applications behind hardened proxies |
 | Observability | Structured logs, metrics, cost ledger, optional LangSmith tracing |
 
 ## What It Does
 
-- Accepts a software-build prompt from the React studio UI.
+- Accepts typed or editable voice-transcribed prompts plus user-supplied images and videos from the React studio UI.
+- Offers Auto, Standard, and Advanced generation profiles with an explicit maximum spend approved before paid planning begins.
 - Runs input guardrails, capability resolution, planner, database/backend/frontend workers, adapter validation, the Universal Repair Kernel, evaluator, release routing, and loop protection.
 - Uses budget-aware role routing: Luna for routing, database, evaluation, and artifact tasks; Terra for planning, frontend/backend generation, and ordinary repairs; Sol only for design and the final evidence-backed repair.
 - Routes development tools through a secure MCP client/server boundary with allowlisted tool access, output redaction, and audit records.
-- Supports Serper web search, Playwright browser tooling, LangGraph checkpoints and long-term memory, Supabase/Postgres persistence, Redis queueing, and LangSmith tracing behind feature flags.
+- Supports Serper web and media search, bounded image/video download or verified embedding,
+  Playwright browser tooling, LangGraph checkpoints and long-term memory, Supabase/Postgres
+  persistence, Redis queueing, and LangSmith tracing behind feature flags.
 - Pauses at capped human-in-the-loop checkpoints with database schema, backend architecture, and frontend screen visuals for approval or targeted revision.
 - Derives explicit requested/excluded capabilities before planning, enforces worker path ownership, and rejects conflicting manifests.
 - Preserves every latest project folder and ZIP under `generated-projects/` and `artifacts/`, with verified, provisional, or quarantined release status.
@@ -46,14 +50,17 @@ and downloadable software project while preserving human control over sensitive 
 ```mermaid
 flowchart LR
     User["User"] --> Studio["React + Vite Studio"]
+    Studio --> Uploads["Validated User Media"]
+    Studio --> Speech["Voice Transcription"]
     Studio --> API["FastAPI Control Plane"]
 
     API --> InputGuard["Input Guardrails"]
     InputGuard --> Graph["LangGraph Parent Workflow"]
 
-    Graph --> Planner["Planner"]
+    Graph --> Preflight["Deterministic Scope + Cost Preflight"]
+    Preflight --> HITL["Upfront Scope + Budget Approval"]
+    HITL --> Planner["Profile-Routed Planner"]
     Graph --> Design["Design Director"]
-    Graph --> HITL["Human Approval Gates"]
 
     Planner --> Workers
     Design --> Workers
@@ -68,6 +75,7 @@ flowchart LR
     MCP --> Search["Serper Search"]
     MCP --> Browser["Playwright Browser"]
     MCP --> Providers["GitHub / Supabase Providers"]
+    Uploads --> Workers
 
     Workers --> Checkpoints["LangGraph Checkpoints + Project Memory"]
     Checkpoints <--> Postgres["Supabase / PostgreSQL"]
@@ -78,6 +86,8 @@ flowchart LR
     Evaluator --> Router{"Release Router"}
 
     Router -->|"verified"| Preview["Docker Preview + ZIP"]
+    Preview --> Explainer["Post-generation Project Explainer"]
+    Explainer --> Guide["Evidence-grounded Project Guide"]
     Router -->|"repairable"| Repair["Universal Repair Kernel"]
     Repair --> Workers
     Router -->|"security risk"| Quarantine["Quarantined Preview + Download"]
@@ -91,12 +101,16 @@ flowchart LR
 ```mermaid
 flowchart TD
     Start(["Job accepted"]) --> Guard["Input policy and capability resolution"]
-    Guard --> Plan["Plan and product specification"]
+    Guard --> Preflight["Deterministic complexity, media and cost preflight"]
+    Preflight --> ProductApproval{"Approve scope, profile and maximum spend?"}
+    ProductApproval -->|"yes"| HumanProduct["Human approval checkpoint"]
+    HumanProduct --> Plan["Profile-routed plan and product specification"]
+    ProductApproval -->|"changes"| Preflight
     Plan --> Design["Visual direction"]
-    Design --> ProductApproval{"Product approval required?"}
-    ProductApproval -->|"yes"| HumanProduct["Human review"]
-    HumanProduct --> Execute
-    ProductApproval -->|"no"| Execute["Parallel worker execution"]
+    Design --> Privileged{"Privileged external action?"}
+    Privileged -->|"yes"| HumanPrivilege["Scoped human approval"]
+    HumanPrivilege --> Execute
+    Privileged -->|"no"| Execute["Required worker execution"]
 
     Execute --> OutputGuard["Output guardrails"]
     OutputGuard --> Assemble["Merge canonical file manifest"]
@@ -123,13 +137,15 @@ flowchart TD
 
 Human-review exits persist the graph state and do not consume worker-attempt or execution-loop
 budgets. Repair nodes always receive the complete canonical project checkpoint, structured failure
-evidence, and an explicit file scope.
+evidence, and an explicit file scope. User uploads survive approval and repair checkpoints, are copied
+only when selected by the generated application, and are removed from temporary storage at termination.
 
 ## Repository Layout
 
 ```text
 .
 ├── backend/                  FastAPI API, agents, LangGraph orchestration and tests
+│   └── uv.lock               Reproducible Python dependency graph
 ├── frontend/                 React/TypeScript studio and workflow interface
 ├── docs/                     Architecture and operational documentation
 ├── scripts/                  Local backend/frontend launch scripts
@@ -231,6 +247,12 @@ Useful feature flags:
 - `OPENAI_TRANSPORT_RETRIES=0` prevents hidden SDK retries from multiplying workflow latency and bypassing the visible recovery ledger.
 - `ENABLE_GUARANTEED_ARTIFACT_FALLBACK=true` preserves a runnable certified checkpoint when initial model output is unusable and forces a targeted semantic repair before success.
 - `MAX_HUMAN_CHECKPOINTS=4` caps approval prompts so workflows stay practical.
+- `MAXIMUM_RUN_BUDGET_USD=1.00` caps Standard jobs; `MAXIMUM_ADVANCED_RUN_BUDGET_USD=5.00` caps the user-selectable Advanced authorization.
+- `OPENAI_TRANSCRIPTION_MODEL` controls editable voice-prompt transcription; recordings are not retained after transcription.
+- `OPENAI_EXPLAINER_MODEL=gpt-6-luna` is the single model used by the read-only project explainer.
+- `ENABLE_PROJECT_EXPLAINER=true` initializes a conversational explainer after verified release without adding a LangGraph node.
+- `EXPLAINER_PROMPT_LIMIT=10` and `EXPLAINER_BUDGET_USD=0.01` enforce the per-build question and cost ceilings.
+- The explainer cannot emit code, patches, commands, or project modifications; blocked requests use a deterministic refusal without an LLM call.
 - `ENABLE_ARTIFACT_VALIDATION=true` installs generated dependencies, runs tests/builds, checks the shared API contract, audits dependencies, and labels failed output without discarding it.
 - `ARTIFACT_VALIDATION_MEMORY_LIMIT_MB=2048` gives production compilers a separate sandbox budget from lightweight previews; resource kills are classified as infrastructure rather than worker defects.
 - `ENABLE_LIVE_PREVIEW=true` enables preview lifecycle endpoints.
@@ -253,25 +275,28 @@ each request; database passwords are forwarded once and are not persisted by Age
 
 ## Run Locally
 
+Install uv 0.12.x first; the backend currently requires at least 0.12.18. Node projects continue to
+use npm because uv manages Python environments and packages, not JavaScript dependencies.
+
 Backend:
 
 ```bash
 cd backend
-python3.11 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
+uv sync --locked --group dev --no-editable
 cd ..
 ./scripts/run_backend.sh
 ```
 
 Keep Docker Desktop or Colima running when artifact validation or preview sandbox mode is
 `docker`. Install Playwright Chromium once with
-`backend/.venv/bin/playwright install chromium` to enable browser smoke checks.
+`uv run --project backend --locked --no-sync playwright install chromium` to enable browser smoke
+checks.
 
 Frontend:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -303,14 +328,14 @@ targeted retry decisions in `artifacts/risk-report.json`.
 
 Generated backends contain exactly one Python dependency strategy. Certified capability packs
 override LLM-selected core framework versions, preserve audited optional dependencies, create
-`package-lock.json` with npm, and verify it with `npm ci`. Production dependencies block at high
-severity; development dependencies block at critical severity and retain high findings as visible
-advisories.
+`uv.lock` with uv or `package-lock.json` with npm, and verify them with `uv sync --locked` or
+`npm ci`. Production dependencies block at high severity; development dependencies block at
+critical severity and retain high findings as visible advisories.
 
 ## Validation
 
 ```bash
-cd backend && pytest
+cd backend && uv run --locked --no-sync pytest
 cd frontend && npm run build
 ```
 
@@ -318,7 +343,7 @@ Run the repeatable twelve-case benchmark, including heritage, commerce/RBAC, bro
 video/upload, and real-time multi-tenant scheduling regressions, without network access:
 
 ```bash
-PYTHONPATH=backend/src backend/.venv/bin/python \
+uv run --project backend --locked --no-sync python \
   -m software_developer_agent.benchmarks.runner \
   --repeat 2 --output benchmark-results/latest.json
 ```
@@ -338,7 +363,8 @@ Run the opt-in Docker and headless Chromium regression from the repository root:
 
 ```bash
 RUN_DOCKER_REGRESSION=1 LANGSMITH_TRACING=false LANGCHAIN_TRACING_V2=false \
-  backend/.venv/bin/python -m pytest -q backend/tests/integration/test_heritage_runtime.py \
+  uv run --project backend --locked --no-sync python -m pytest -q \
+  backend/tests/integration/test_heritage_runtime.py \
   --basetemp=.agentic-forge/repair-regression-tests
 ```
 
@@ -350,6 +376,13 @@ its preview containers afterward. Preview readiness waits for HTTP, not just an 
 The API accepts long-running generation jobs with HTTP `202` and executes them in the background.
 The studio polls job state, preventing model calls and dependency installation from occupying one
 long browser request.
+
+Verified builds expose `GET /api/jobs/{job_id}/guide`, the idempotent
+`POST /api/jobs/{job_id}/guide`, and `POST /api/jobs/{job_id}/guide/messages`. The single-model
+explainer retrieves a redacted, size-bounded evidence bundle for each question and stores its
+conversation separately from the generation cost ledger. It permits ten prompts, caches repeated
+answers, enforces a one-cent hard budget, and has no artifact-write or execution capability. Its
+failure never changes build or release status.
 
 ## Production Notes
 

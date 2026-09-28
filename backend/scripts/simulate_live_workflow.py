@@ -7,7 +7,7 @@ so this reaches every part of the live path that does not depend on model qualit
 
 Usage, from the backend directory:
 
-    ARTIFACT_VALIDATION_SANDBOX_MODE=local .venv/bin/python \
+    ARTIFACT_VALIDATION_SANDBOX_MODE=local uv run --locked --no-sync python \
         scripts/simulate_live_workflow.py [case_id ...]
 
 A case passes when it produces an artifact with the correct worker routing and stops

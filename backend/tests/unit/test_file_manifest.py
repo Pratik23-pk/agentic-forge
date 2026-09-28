@@ -78,7 +78,7 @@ def test_worker_manifest_prompt_does_not_default_to_sqlite() -> None:
     assert "Never delete, skip, or weaken a valid test" in prompt
 
 
-def test_pwdlib_recommended_hashing_receives_argon2_extra() -> None:
+def test_pwdlib_recommended_hashing_receives_compatible_hash_extras() -> None:
     manifest = WorkerFileManifest(
         worker_kind=WorkerKind.BACKEND,
         summary="Authentication backend",
@@ -102,7 +102,93 @@ def test_pwdlib_recommended_hashing_receives_argon2_extra() -> None:
         file.content for file in normalized.files if file.path == "backend/pyproject.toml"
     )
 
-    assert '"pwdlib[argon2]==0.3.0"' in pyproject
+    assert '"pwdlib[argon2,bcrypt]==0.3.0"' in pyproject
+
+
+def test_pwdlib_recommended_hashing_is_normalized_for_bcrypt_seed_compatibility() -> None:
+    manifest = WorkerFileManifest(
+        worker_kind=WorkerKind.BACKEND,
+        summary="Auth backend",
+        operation="replace",
+        files=[
+            GeneratedFileSpec(
+                "backend/pyproject.toml",
+                '[project]\nname="auth-api"\nversion="1.0.0"\n'
+                'dependencies=["pwdlib==0.2.1"]\n',
+                WorkerKind.BACKEND,
+            ),
+            GeneratedFileSpec(
+                "backend/src/app/main.py",
+                "from pwdlib import PasswordHash\n"
+                "password_hash = PasswordHash.recommended()\n",
+                WorkerKind.BACKEND,
+            ),
+        ],
+    )
+
+    normalized = normalize_worker_manifest(manifest, "fastapi-api")
+    source = next(file.content for file in normalized.files if file.path.endswith("main.py"))
+    pyproject = next(
+        file.content for file in normalized.files if file.path.endswith("pyproject.toml")
+    )
+
+    assert "from pwdlib.hashers.argon2 import Argon2Hasher" in source
+    assert "from pwdlib.hashers.bcrypt import BcryptHasher" in source
+    assert "PasswordHash((Argon2Hasher(), BcryptHasher()))" in source
+    assert '"pwdlib[argon2,bcrypt]==0.2.1"' in pyproject
+
+
+def test_session_middleware_receives_itsdangerous_dependency() -> None:
+    manifest = WorkerFileManifest(
+        worker_kind=WorkerKind.BACKEND,
+        summary="Session backend",
+        operation="replace",
+        files=[
+            GeneratedFileSpec(
+                "backend/requirements.txt",
+                "fastapi==0.115.12\n",
+                WorkerKind.BACKEND,
+            ),
+            GeneratedFileSpec(
+                "backend/app.py",
+                "from starlette.middleware.sessions import SessionMiddleware\n",
+                WorkerKind.BACKEND,
+            ),
+        ],
+    )
+
+    normalized = normalize_worker_manifest(manifest, "fastapi-api")
+    requirements = next(
+        file.content for file in normalized.files if file.path.endswith("requirements.txt")
+    )
+
+    assert "itsdangerous==2.2.0" in requirements
+
+
+def test_missing_python_build_backend_is_normalized_for_src_package() -> None:
+    manifest = WorkerFileManifest(
+        worker_kind=WorkerKind.BACKEND,
+        summary="FastAPI backend",
+        operation="replace",
+        files=[
+            GeneratedFileSpec(
+                "backend/pyproject.toml",
+                '[project]\nname="demo-api"\nversion="1.0.0"\ndependencies=[]\n',
+                WorkerKind.BACKEND,
+            ),
+            GeneratedFileSpec("backend/src/app/__init__.py", "", WorkerKind.BACKEND),
+            GeneratedFileSpec("backend/src/app/main.py", "app = object()\n", WorkerKind.BACKEND),
+        ],
+    )
+
+    normalized = normalize_worker_manifest(manifest, "fastapi-api")
+    pyproject = next(
+        file.content for file in normalized.files if file.path.endswith("pyproject.toml")
+    )
+
+    assert 'requires = ["hatchling==1.27.0"]' in pyproject
+    assert 'build-backend = "hatchling.build"' in pyproject
+    assert 'packages = ["src/app"]' in pyproject
 
 
 def test_async_sqlalchemy_receives_greenlet_runtime_dependency() -> None:

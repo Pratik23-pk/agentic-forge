@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BookOpenCheck,
   Check,
   ChevronRight,
   CircleDot,
@@ -8,16 +9,22 @@ import {
   Download,
   ExternalLink,
   FileCode2,
+  Film,
   Github,
+  Image as ImageIcon,
   Layers3,
   MessageSquare,
+  Mic,
   Monitor,
+  Paperclip,
   Play,
   RefreshCw,
   Save,
   ShieldCheck,
   Sparkles,
-  TerminalSquare
+  Square,
+  TerminalSquare,
+  X
 } from "lucide-react";
 import { FormEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,6 +32,7 @@ import {
   generatedProjectDownloadUrl,
   collaborationWebSocketUrl,
   createSupabaseProject,
+  deleteUploadedMedia,
   getGeneratedFileContent,
   getJob,
   getMetrics,
@@ -41,10 +49,13 @@ import {
   submitHumanFeedback,
   submitJob,
   syncToGitHub,
+  transcribeVoice,
   updateGeneratedFile,
   updateDesignTokens,
+  uploadMedia,
   type DesignTokenFile,
   type GeneratedFile,
+  type GenerationProfile,
   type HumanFeedbackDecision,
   type HumanFeedbackRequest,
   type JobState,
@@ -52,10 +63,12 @@ import {
   type PreviewRecord,
   type ProviderStatus,
   type TaskStatus,
+  type UploadedMediaAsset,
   type WorkerKind
 } from "../lib/api";
 import { createReadableProjectName } from "../lib/projectName";
 import { LandingPage } from "./LandingPage";
+import { ProjectGuidePage } from "./ProjectGuidePage";
 
 type NodeStatus = "queued" | "active" | "review" | "complete" | "failed" | "blocked";
 type WorkspaceView = "preview" | "files" | "activity" | "controls";
@@ -148,14 +161,32 @@ export function App() {
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
+  function navigate(pathname: string) {
+    window.history.pushState({}, "", pathname);
+    setPath(pathname);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  const guideMatch = path.match(/^\/studio\/projects\/([^/]+)\/guide$/);
+  if (guideMatch) {
+    return (
+      <ProjectGuidePage
+        jobId={decodeURIComponent(guideMatch[1])}
+        onBack={() => navigate("/studio")}
+      />
+    );
+  }
+
   return path.startsWith("/studio") ? (
-    <DevelopmentPanel />
+    <DevelopmentPanel
+      onOpenGuide={(jobId) => navigate(`/studio/projects/${encodeURIComponent(jobId)}/guide`)}
+    />
   ) : (
     <LandingPage onEnterStudio={enterStudio} />
   );
 }
 
-function DevelopmentPanel() {
+function DevelopmentPanel({ onOpenGuide }: { onOpenGuide: (jobId: string) => void }) {
   const [jobs, setJobs] = useState<JobState[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobState | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -163,6 +194,13 @@ function DevelopmentPanel() {
   const [projectId, setProjectId] = useState(createReadableProjectName);
   const [runImmediately, setRunImmediately] = useState(true);
   const [capabilityId, setCapabilityId] = useState("");
+  const [generationProfile, setGenerationProfile] = useState<GenerationProfile>("auto");
+  const [uploadedAssets, setUploadedAssets] = useState<UploadedMediaAsset[]>([]);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcriptionCost, setTranscriptionCost] = useState(0);
   const [activeNodeId, setActiveNodeId] = useState("backend");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,6 +217,12 @@ function DevelopmentPanel() {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("preview");
   const automaticPreviewJobs = useRef(new Set<string>());
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef(0);
+  const cancelRecordingRef = useRef(false);
 
   const nodes = useMemo(() => buildNodes(selectedJob), [selectedJob]);
   const activeNode = nodes.find((node) => node.id === activeNodeId) ?? nodes[2];
@@ -314,17 +358,131 @@ function DevelopmentPanel() {
         prompt,
         projectId || "default",
         runImmediately,
-        capabilityId || undefined
+        capabilityId || undefined,
+        generationProfile,
+        uploadedAssets.map((asset) => asset.asset_id)
       );
       setJobs((current) => [job, ...current.filter((item) => item.job_id !== job.job_id)]);
       setSelectedJob(job);
       setActiveNodeId(firstActiveNode(buildNodes(job)).id);
       setMetrics(await getMetrics());
+      setUploadedAssets([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Workflow launch failed.");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleMediaSelection(files: FileList | null) {
+    if (!files?.length) {
+      return;
+    }
+    setUploadBusy(true);
+    setError(null);
+    try {
+      const assets = await uploadMedia(Array.from(files));
+      setUploadedAssets((current) => [...current, ...assets]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Media upload failed.");
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function handleRemoveMedia(assetId: string) {
+    try {
+      await deleteUploadedMedia(assetId);
+      setUploadedAssets((current) => current.filter((asset) => asset.asset_id !== assetId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to remove uploaded media.");
+    }
+  }
+
+  async function startVoiceRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Voice recording is not supported by this browser.");
+      return;
+    }
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = preferredRecordingMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordingStreamRef.current = stream;
+      recordingChunksRef.current = [];
+      cancelRecordingRef.current = false;
+      recordingStartedAtRef.current = Date.now();
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const cancelled = cancelRecordingRef.current;
+        const duration = Math.max((Date.now() - recordingStartedAtRef.current) / 1000, 0.1);
+        const blob = new Blob(recordingChunksRef.current, {
+          type: recorder.mimeType || "audio/webm"
+        });
+        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        recorderRef.current = null;
+        recordingChunksRef.current = [];
+        setRecording(false);
+        setRecordingSeconds(0);
+        if (!cancelled) {
+          void transcribeRecording(blob, duration);
+        }
+      };
+      recorder.start(500);
+      setRecording(true);
+    } catch (err) {
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      setError(err instanceof Error ? err.message : "Microphone access failed.");
+    }
+  }
+
+  function stopVoiceRecording(cancelled = false) {
+    cancelRecordingRef.current = cancelled;
+    if (recorderRef.current?.state !== "inactive") {
+      recorderRef.current?.stop();
+    }
+  }
+
+  async function transcribeRecording(blob: Blob, duration: number) {
+    setTranscribing(true);
+    setError(null);
+    try {
+      const result = await transcribeVoice(blob, duration);
+      setPrompt((current) => [current.trim(), result.transcript].filter(Boolean).join(" "));
+      setTranscriptionCost((current) => current + result.estimated_cost_usd);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Voice transcription failed.");
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
+  function selectGenerationProfile(profile: GenerationProfile) {
+    setGenerationProfile(profile);
+  }
+
+  async function handleNewProject() {
+    await Promise.allSettled(
+      uploadedAssets.map((asset) => deleteUploadedMedia(asset.asset_id))
+    );
+    if (recording) {
+      stopVoiceRecording(true);
+    }
+    setUploadedAssets([]);
+    setSelectedJob(null);
+    setPrompt("");
+    setProjectId(createReadableProjectName());
+    setGenerationProfile("auto");
+    setTranscriptionCost(0);
+    setWorkspaceView("preview");
+    setError(null);
   }
 
   async function handleRunNext() {
@@ -374,7 +532,8 @@ function DevelopmentPanel() {
       const job = await submitHumanFeedback(
         selectedJob.job_id,
         decision,
-        feedbackMessage.trim() || undefined
+        feedbackMessage.trim() || undefined,
+        activeFeedback.checkpoint_id
       );
       setJobs((current) => [job, ...current.filter((item) => item.job_id !== job.job_id)]);
       setSelectedJob(job);
@@ -382,6 +541,12 @@ function DevelopmentPanel() {
       setFeedbackMessage("");
       setMetrics(await getMetrics());
     } catch (err) {
+      try {
+        const current = await getJob(selectedJob.job_id);
+        setSelectedJob(current);
+        setJobs((jobs) => [current, ...jobs.filter((item) => item.job_id !== current.job_id)]);
+      } catch {
+      }
       setError(err instanceof Error ? err.message : "Feedback submission failed.");
     } finally {
       setBusy(false);
@@ -395,10 +560,22 @@ function DevelopmentPanel() {
   }, []);
 
   useEffect(() => {
+    if (!recording) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setRecordingSeconds(Math.max(0, Math.floor((Date.now() - recordingStartedAtRef.current) / 1000)));
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [recording]);
+
+  useEffect(() => {
     const jobId = selectedJob?.job_id;
     const isActive =
       selectedJob &&
-      ["running", "evaluating", "retrying"].includes(selectedJob.status);
+      ["running", "evaluating", "retrying", "awaiting_human_feedback"].includes(
+        selectedJob.status
+      );
     if (!jobId || !isActive) {
       return;
     }
@@ -412,7 +589,11 @@ function DevelopmentPanel() {
         }
         setSelectedJob(job);
         setJobs((current) => [job, ...current.filter((item) => item.job_id !== job.job_id)]);
-        if (!["running", "evaluating", "retrying"].includes(job.status)) {
+        if (
+          !["running", "evaluating", "retrying", "awaiting_human_feedback"].includes(
+            job.status
+          )
+        ) {
           setMetrics(await getMetrics());
         }
       } catch (err) {
@@ -520,6 +701,16 @@ function DevelopmentPanel() {
             <RefreshCw size={15} aria-hidden="true" />
             Refresh
           </button>
+          {selectedJob?.status === "succeeded" && selectedJob.release_status === "verified" ? (
+            <button
+              className="studio-guide-button"
+              type="button"
+              onClick={() => onOpenGuide(selectedJob.job_id)}
+            >
+              <BookOpenCheck size={15} aria-hidden="true" />
+              Project guide
+            </button>
+          ) : null}
           <button type="button" onClick={() => setWorkspaceView("controls")}>
             <ShieldCheck size={15} aria-hidden="true" />
             Release
@@ -536,13 +727,7 @@ function DevelopmentPanel() {
             </div>
             <button
               type="button"
-              onClick={() => {
-                setSelectedJob(null);
-                setPrompt("");
-                setProjectId(createReadableProjectName());
-                setWorkspaceView("preview");
-                setError(null);
-              }}
+              onClick={() => void handleNewProject()}
             >
               <Sparkles size={14} aria-hidden="true" />
               New
@@ -609,6 +794,86 @@ function DevelopmentPanel() {
               placeholder="Build a customer portal with authentication, billing, analytics and an admin dashboard…"
               rows={4}
             />
+            <input
+              ref={mediaInputRef}
+              className="studio-media-input"
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg"
+              multiple
+              onChange={(event) => {
+                void handleMediaSelection(event.currentTarget.files);
+                event.currentTarget.value = "";
+              }}
+            />
+            <div className="studio-intake-tools">
+              <button
+                type="button"
+                onClick={() => mediaInputRef.current?.click()}
+                disabled={uploadBusy || busy}
+              >
+                <Paperclip size={14} aria-hidden="true" />
+                {uploadBusy ? "Uploading" : "Add photos or videos"}
+              </button>
+              {!recording ? (
+                <button
+                  type="button"
+                  onClick={() => void startVoiceRecording()}
+                  disabled={transcribing || busy}
+                >
+                  <Mic size={14} aria-hidden="true" />
+                  {transcribing ? "Transcribing" : "Speak prompt"}
+                </button>
+              ) : (
+                <>
+                  <button className="recording" type="button" onClick={() => stopVoiceRecording()}>
+                    <Square size={12} aria-hidden="true" />
+                    Stop {formatDuration(recordingSeconds)}
+                  </button>
+                  <button type="button" onClick={() => stopVoiceRecording(true)}>
+                    <X size={14} aria-hidden="true" />
+                    Cancel
+                  </button>
+                </>
+              )}
+              <span>Review and edit the transcript before building.</span>
+            </div>
+            {uploadedAssets.length ? (
+              <div className="studio-upload-list" aria-label="Attached media">
+                {uploadedAssets.map((asset) => (
+                  <div key={asset.asset_id}>
+                    {asset.kind === "image" ? <ImageIcon size={14} /> : <Film size={14} />}
+                    <span>{asset.filename}</span>
+                    <small>{formatBytes(asset.bytes)}</small>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${asset.filename}`}
+                      onClick={() => void handleRemoveMedia(asset.asset_id)}
+                    >
+                      <X size={13} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="studio-profile-selector" aria-label="Generation mode">
+              {(["auto", "standard", "advanced"] as GenerationProfile[]).map((profile) => (
+                <button
+                  key={profile}
+                  className={generationProfile === profile ? "active" : ""}
+                  type="button"
+                  onClick={() => selectGenerationProfile(profile)}
+                >
+                  <strong>{profile === "auto" ? "Auto" : profile === "standard" ? "Standard" : "Advanced"}</strong>
+                  <span>
+                    {profile === "auto"
+                      ? "Recommended routing"
+                      : profile === "standard"
+                        ? "Small, focused builds"
+                        : "Full-stack and media-heavy"}
+                  </span>
+                </button>
+              ))}
+            </div>
             <div className="studio-composer-actions">
               <details>
                 <summary>Advanced</summary>
@@ -634,8 +899,14 @@ function DevelopmentPanel() {
                   </label>
                 </div>
               </details>
-              <span>{wordCount(prompt)} words</span>
-              <button disabled={busy || !prompt.trim()} type="submit">
+              <span>
+                {wordCount(prompt)} words
+                {transcriptionCost > 0 ? ` · voice est. $${transcriptionCost.toFixed(4)}` : ""}
+              </span>
+              <button
+                disabled={busy || uploadBusy || transcribing || recording || !prompt.trim()}
+                type="submit"
+              >
                 {busy ? <RefreshCw className="studio-spinner" size={15} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
                 {busy ? "Building" : "Build"}
               </button>
@@ -1722,14 +1993,14 @@ function activeFeedbackRequest(job: JobState | null): HumanFeedbackRequest | nul
 }
 
 function approvalGateLabel(gate: HumanFeedbackRequest["gate"]): string {
-  if (gate === "product_contract") return "Product contract";
+  if (gate === "product_contract") return "Scope review";
   if (gate === "privileged_action") return "Scoped permission";
   if (gate === "release") return "Release approval";
   return "Worker review";
 }
 
 function approvalButtonLabel(gate: HumanFeedbackRequest["gate"]): string {
-  if (gate === "product_contract") return "Approve contract";
+  if (gate === "product_contract") return "Approve and start";
   if (gate === "privileged_action") return "Approve scoped actions";
   if (gate === "release") return "Approve release";
   return "Approve";
@@ -1756,6 +2027,18 @@ function nodeInitials(title: string): string {
 
 function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function preferredRecordingMimeType(): string {
+  return ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find(
+    (mimeType) => MediaRecorder.isTypeSupported(mimeType)
+  ) ?? "";
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
 function contextEstimate(text: string): number {
