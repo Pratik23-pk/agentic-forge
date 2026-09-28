@@ -27,7 +27,7 @@ and downloadable software project while preserving human control over sensitive 
 ## What It Does
 
 - Accepts typed or editable voice-transcribed prompts plus user-supplied images and videos from the React studio UI.
-- Offers Auto, Standard, and Advanced generation profiles with an explicit maximum spend approved before paid planning begins.
+- Offers Auto, Standard, and Advanced generation profiles while keeping monetary ceilings developer-controlled and automatically selected from request complexity.
 - Runs input guardrails, capability resolution, planner, database/backend/frontend workers, adapter validation, the Universal Repair Kernel, evaluator, release routing, and loop protection.
 - Uses budget-aware role routing: Luna for routing, database, evaluation, and artifact tasks; Terra for planning, frontend/backend generation, and ordinary repairs; Sol only for design and the final evidence-backed repair.
 - Routes development tools through a secure MCP client/server boundary with allowlisted tool access, output redaction, and audit records.
@@ -42,6 +42,52 @@ and downloadable software project while preserving human control over sensitive 
 - Provides optimistic browser editing, revision history, WebSocket presence, visual CSS-token controls, and automatic ZIP refresh.
 - Offers credential-gated GitHub branch/commit/PR sync and explicit-confirmation Supabase project provisioning.
 - Keeps generated applications inside the local or Docker preview sandbox; public preview URLs and deployment are intentionally deferred until Agentic Forge has its own domain infrastructure.
+
+## Current Release Highlights
+
+### Automatic Generation Profiles
+
+The Studio presents three understandable build modes without exposing a raw maximum-spend field:
+
+| Mode | Intended workload | Budget behavior |
+| --- | --- | --- |
+| Auto | Recommended default | Deterministically selects Standard or Advanced from requested capabilities, domain adapters, and uploaded media |
+| Standard | Focused sites, APIs, utilities, and smaller applications | Uses the normal model route and a developer-enforced hard ceiling of `$1.00` |
+| Advanced | Full-stack, authentication, payments, databases, real-time systems, and media-heavy products | Uses expanded research and repair capacity with a `$1.50` default and `$5.00` developer ceiling |
+
+The backend records the selected profile, estimated range, complexity signals, and authorized ceiling
+before the first paid planning call. Studio users approve the product contract and generation mode;
+they do not manually configure internal model-spend controls.
+
+### Multimodal Project Intake
+
+- Type a request or record a voice prompt, then review and edit its transcription before submission.
+- Attach validated images and videos directly to the generation request.
+- Let workers combine user uploads with permitted Serper-discovered downloads, remote media, or verified embeds when the product requires them.
+- Keep user media references across human approvals and repair checkpoints without repeatedly uploading files.
+- Copy only selected assets into the generated project and remove temporary upload/download caches when the workflow reaches a terminal state or replans.
+
+### Conversational Project Explainer
+
+Every verified build can open a separate Project Guide after generation. This is intentionally outside
+the software-generation LangGraph and uses one lightweight `gpt-6-luna` model with no tools, shell,
+filesystem writes, or artifact mutation capability.
+
+- Answers architecture, stack, behavior, validation, and file-location questions from redacted project evidence.
+- Allows at most ten user questions per generated project.
+- Enforces a separate `$0.01` project budget and `$0.001` per-question authorization.
+- Returns cached answers for repeated normalized questions without another model call.
+- Rejects source-code reproduction, patches, fixes, rewrites, and modification requests with a deterministic zero-model-cost refusal.
+- Keeps explainer messages and cost accounting separate from the generation ledger, so explainer failure cannot change build or release status.
+
+### End-to-End User Journey
+
+1. Name the project, describe it by text or voice, and optionally attach media.
+2. Choose Auto, Standard, or Advanced generation mode and optionally select a certified stack.
+3. Approve the product contract and any genuinely privileged provider action.
+4. Watch planning, generation, validation, targeted repair, evaluation, and release routing in the Studio.
+5. Approve the release, run the isolated preview, inspect validation evidence, and download the complete project ZIP.
+6. Open Project Guide to ask read-only questions about the verified software.
 
 ## Architecture
 
@@ -58,7 +104,7 @@ flowchart LR
     InputGuard --> Graph["LangGraph Parent Workflow"]
 
     Graph --> Preflight["Deterministic Scope + Cost Preflight"]
-    Preflight --> HITL["Upfront Scope + Budget Approval"]
+    Preflight --> HITL["Upfront Scope + Mode Approval"]
     HITL --> Planner["Profile-Routed Planner"]
     Graph --> Design["Design Director"]
 
@@ -86,8 +132,8 @@ flowchart LR
     Evaluator --> Router{"Release Router"}
 
     Router -->|"verified"| Preview["Docker Preview + ZIP"]
-    Preview --> Explainer["Post-generation Project Explainer"]
-    Explainer --> Guide["Evidence-grounded Project Guide"]
+    Preview --> Explainer["Read-only Project Explainer outside LangGraph"]
+    Explainer --> Guide["Conversational Evidence-grounded Guide"]
     Router -->|"repairable"| Repair["Universal Repair Kernel"]
     Repair --> Workers
     Router -->|"security risk"| Quarantine["Quarantined Preview + Download"]
@@ -102,7 +148,7 @@ flowchart LR
 flowchart TD
     Start(["Job accepted"]) --> Guard["Input policy and capability resolution"]
     Guard --> Preflight["Deterministic complexity, media and cost preflight"]
-    Preflight --> ProductApproval{"Approve scope, profile and maximum spend?"}
+    Preflight --> ProductApproval{"Approve scope and generation mode?"}
     ProductApproval -->|"yes"| HumanProduct["Human approval checkpoint"]
     HumanProduct --> Plan["Profile-routed plan and product specification"]
     ProductApproval -->|"changes"| Preflight
@@ -241,13 +287,14 @@ Useful feature flags:
 - `ENABLE_MCP_TOOLS=true` keeps tool calls behind the MCP boundary.
 - `ENABLE_HUMAN_CHECKPOINTS=true` pauses for visual review checkpoints.
 - `ENABLE_LANGGRAPH_CHECKPOINTING=true` preserves canonical generated-file state across retries and process restarts.
-- `OPENAI_REPAIR_MODEL=gpt-5.4` reserves the stronger model for repeated, evidence-backed failures.
+- `OPENAI_REPAIR_MODEL=gpt-5.6-sol` reserves the strongest configured model for repeated, evidence-backed failures.
 - `MAX_MANIFEST_RECOVERY_ATTEMPTS=2` bounds non-budgeted manifest-format recovery calls.
 - `MAX_LLM_CALLS_PER_NODE=6` caps repeated calls from any one model node in a job.
 - `OPENAI_TRANSPORT_RETRIES=0` prevents hidden SDK retries from multiplying workflow latency and bypassing the visible recovery ledger.
 - `ENABLE_GUARANTEED_ARTIFACT_FALLBACK=true` preserves a runnable certified checkpoint when initial model output is unusable and forces a targeted semantic repair before success.
 - `MAX_HUMAN_CHECKPOINTS=4` caps approval prompts so workflows stay practical.
-- `MAXIMUM_RUN_BUDGET_USD=1.00` caps Standard jobs; `MAXIMUM_ADVANCED_RUN_BUDGET_USD=5.00` caps the user-selectable Advanced authorization.
+- `MAXIMUM_RUN_BUDGET_USD=1.00` caps Standard jobs; `MAXIMUM_ADVANCED_RUN_BUDGET_USD=5.00` caps the internal Advanced-mode authorization.
+- Studio users never edit these monetary values. Auto mode derives the effective profile and budget from capability, adapter, complexity, and media signals; operators retain control through environment configuration.
 - `OPENAI_TRANSCRIPTION_MODEL` controls editable voice-prompt transcription; recordings are not retained after transcription.
 - `OPENAI_EXPLAINER_MODEL=gpt-6-luna` is the single model used by the read-only project explainer.
 - `ENABLE_PROJECT_EXPLAINER=true` initializes a conversational explainer after verified release without adding a LangGraph node.
@@ -318,6 +365,7 @@ After a workflow:
 - Adjust existing CSS custom properties in the visual token editor without allowing arbitrary CSS injection.
 - Sync only a verified snapshot to a GitHub branch and pull request when provider actions are enabled.
 - Test the application only through the sandbox preview. Agentic Forge does not currently create public preview or production URLs.
+- Open the read-only Project Guide after verified release for an evidence-grounded conversation about architecture, behavior, validation, and project files.
 - External services such as GitHub, CI/CD, hosting, payments, or cloud databases are scaffolded only when positively requested and use `.env.example` placeholders instead of real credentials.
 
 Every latest manifest is preserved as a project folder and ZIP. Passing output is `verified`.
