@@ -61,7 +61,12 @@ export function PublishDialog({ jobId, job }: { jobId: string | undefined; job: 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" disabled={!jobId}>
+        <Button
+          size="sm"
+          // Prominent only when publishing can actually happen.
+          variant={job?.status === "succeeded" && job.releaseStatus === "verified" ? "default" : "secondary"}
+          disabled={!jobId}
+        >
           <GitBranchIcon data-icon="inline-start" />
           Publish
         </Button>

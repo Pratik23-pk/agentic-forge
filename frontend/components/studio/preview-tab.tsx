@@ -30,6 +30,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { JobPart } from "@/lib/contract";
 import { getPreview, previewLogs, queryKeys, startPreview, stopPreview } from "@/lib/studio/api";
+import { summarizeError } from "@/lib/studio/errors";
 import { cn } from "@/lib/utils";
 
 const DEVICE_WIDTH = {
@@ -41,6 +42,23 @@ const DEVICE_WIDTH = {
 type Device = keyof typeof DEVICE_WIDTH;
 
 const READY_STATUSES = new Set(["succeeded", "failed", "blocked", "awaiting_human_feedback"]);
+
+function FailureText({ raw }: { raw: string }) {
+  const { summary, details } = summarizeError(raw);
+  return (
+    <>
+      <p className="break-words">{summary}</p>
+      {details ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">Show details</summary>
+          <pre className="mt-2 max-h-48 overflow-auto rounded-md border bg-background p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+            {details}
+          </pre>
+        </details>
+      ) : null}
+    </>
+  );
+}
 
 /** Mounted only while starting, so its timer begins at zero on every start. */
 function StartingState() {
@@ -166,7 +184,7 @@ export function PreviewTab({ jobId, job }: { jobId: string | undefined; job: Job
             <Alert variant="destructive" className="max-w-md">
               <AlertTitle>The preview could not start</AlertTitle>
               <AlertDescription>
-                <p className="break-words">{failure}</p>
+                <FailureText raw={failure} />
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => start.mutate()}>
                     Try again
