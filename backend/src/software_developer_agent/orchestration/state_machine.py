@@ -67,6 +67,10 @@ from software_developer_agent.orchestration.conditional_router import (
     RouteAction,
     RouteDecision,
 )
+from software_developer_agent.orchestration.generation_profiles import (
+    is_advanced_job,
+    prepare_job_preflight,
+)
 from software_developer_agent.orchestration.human_feedback import HumanFeedbackCoordinator
 from software_developer_agent.orchestration.loop_count_interceptor import LoopCountInterceptor
 from software_developer_agent.orchestration.repair_kernel import (
@@ -79,7 +83,9 @@ from software_developer_agent.orchestration.workflow_graph import (
     WorkflowGraphState,
     build_workflow_graph,
 )
+from software_developer_agent.tools.media_assets import cleanup_media_cache
 from software_developer_agent.tools.registry import ToolRegistry
+from software_developer_agent.tools.user_media import cleanup_user_media
 
 RETRY_CORRECTION_MARKER = "\nValidation failure to correct:\n"
 INPUT_GUARDRAIL_NAMES = frozenset(
@@ -110,8 +116,14 @@ class AgentRuntime:
         self._planner_llm_client = self._create_llm_client(
             "planner", self._settings.openai_planner_model, "medium", 3_500
         )
+        self._standard_planner_llm_client = self._create_llm_client(
+            "planner.standard", self._settings.openai_router_model, "low", 2_400
+        )
         self._design_llm_client = self._create_llm_client(
             "design", self._settings.openai_design_model, "high", 1_800
+        )
+        self._standard_design_llm_client = self._create_llm_client(
+            "design.standard", self._settings.openai_router_model, "low", 1_200
         )
         self._frontend_llm_client = self._create_llm_client(
             "worker.frontend",
@@ -167,9 +179,17 @@ class AgentRuntime:
         self._context_manager = ProjectContextManager(settings=self._settings)
         self._manifest_checkpoints = ManifestCheckpointManager(self._settings)
         self._planner = PlannerAgent(self._settings, self._planner_llm_client)
+        self._standard_planner = PlannerAgent(
+            self._settings,
+            self._standard_planner_llm_client,
+        )
         self._design_director = DesignDirectorAgent(
             self._settings,
             self._design_llm_client,
+        )
+        self._standard_design_director = DesignDirectorAgent(
+            self._settings,
+            self._standard_design_llm_client,
         )
         self._evaluator = EvaluatorAgent(self._settings, self._evaluator_llm_client)
         self._loop_interceptor = LoopCountInterceptor(self._settings.max_job_loops)
@@ -291,9 +311,15 @@ class AgentRuntime:
 
     def run_to_completion(self, job: JobState) -> RouteDecision:
         self._active_job = job
+        prepare_job_preflight(job, self._settings)
+        approved_release = self._approved_release_snapshot(job)
+        if approved_release is not None:
+            self._restore_approved_release(job, approved_release)
         self._cost_ledger.initialize(job)
+        resume_node = self._workflow_resume_node(job)
         initial_state: WorkflowGraphState = {
             "job": job.to_dict(),
+            "resume_node": resume_node,
             "retry_targets": None,
             "repair_registered": False,
             "next_action": "continue",
@@ -305,14 +331,17 @@ class AgentRuntime:
             self._settings.max_total_attempts,
         )
         config = {
-            "configurable": {"thread_id": f"{job.job_id}:workflow"},
+            "configurable": {
+                "thread_id": self._workflow_thread_id(job, resume_node),
+            },
             "recursion_limit": max(50, (configured_cycles + 3) * 8),
         }
         with (
             trace_span("job.run", settings=self._settings, job_id=job.job_id),
             open_langgraph_resources(self._settings) as (checkpointer, store),
         ):
-            graph = build_workflow_graph(self, checkpointer, store)
+            graph_checkpointer = None if resume_node == "finalize_success" else checkpointer
+            graph = build_workflow_graph(self, graph_checkpointer, store)
             final_state = dict(graph.invoke(initial_state, config))
 
         restored = job_state_from_dict(final_state["job"])
@@ -326,6 +355,79 @@ class AgentRuntime:
             job.set_status(JobStatus.FAILED)
             return RouteDecision(RouteAction.FAILURE, reason)
         return _route_from_payload(route_payload)
+
+    def _workflow_resume_node(self, job: JobState) -> str:
+        release_is_ready = (
+            job.active_feedback_request() is None
+            and self._feedback.release_approved(job)
+            and job.release_status in {ReleaseStatus.VERIFIED, ReleaseStatus.QUARANTINED}
+            and bool(job.artifacts)
+            and job.evaluation is not None
+            and job.evaluation.passed
+        )
+        return "finalize_success" if release_is_ready else "guardrails"
+
+    @staticmethod
+    def _workflow_thread_id(job: JobState, resume_node: str) -> str:
+        if resume_node == "finalize_success":
+            revision = int(job.approval_state.get("revision", 0))
+            return f"{job.job_id}:workflow:release:{revision}"
+        return f"{job.job_id}:workflow"
+
+    @staticmethod
+    def _approved_release_snapshot(job: JobState) -> dict[str, Any] | None:
+        current_artifacts = {artifact.name for artifact in job.artifacts}
+        for request in reversed(job.feedback_requests):
+            if request.gate.value != "release" or request.status.value != "approved":
+                continue
+            release = request.metadata.get("release")
+            if not isinstance(release, dict):
+                continue
+            validation = release.get("validation")
+            artifacts = release.get("artifacts")
+            if not isinstance(validation, dict) or not validation.get("passed"):
+                continue
+            if not isinstance(artifacts, list):
+                continue
+            approved_names = {
+                str(artifact.get("name"))
+                for artifact in artifacts
+                if isinstance(artifact, dict) and artifact.get("name")
+            }
+            if approved_names and approved_names.issubset(current_artifacts):
+                return release
+        return None
+
+    @staticmethod
+    def _restore_approved_release(job: JobState, release: dict[str, Any]) -> None:
+        validation = release.get("validation", {})
+        release_status = str(release.get("release_status", ReleaseStatus.VERIFIED.value))
+        job.release_status = ReleaseStatus(release_status)
+        job.evaluation = EvaluationResult(
+            passed=True,
+            checks=list(validation.get("checks", [])),
+            decision="approved_release_snapshot",
+            warnings=list(validation.get("advisories", [])),
+            evidence=[{"source": "human_approved_release_snapshot"}],
+        )
+        job.risk_findings = list(release.get("risk_findings", []))
+        job.artifact_errors = []
+        job.errors = []
+        job.resolve_repair_tickets()
+
+    def cleanup_transient_media(self, job: JobState) -> None:
+        try:
+            cleanup_media_cache(job, self._settings)
+            cleanup_user_media(job, self._settings)
+        except OSError as exc:
+            warning = f"Temporary media cleanup requires attention: {exc}"
+            if warning not in job.warnings:
+                job.warnings.append(warning)
+            logger.warning(
+                "job.media_cache_cleanup_failed",
+                extra={"job_id": job.job_id},
+                exc_info=True,
+            )
 
     @property
     def workflow_node_names(self) -> tuple[str, ...]:
@@ -355,6 +457,12 @@ class AgentRuntime:
         self._manifest_checkpoints.restore(job)
         return self._graph_update(job, phase="guardrails", next_action="continue")
 
+    def graph_preflight(self, state: WorkflowGraphState) -> dict[str, Any]:
+        job = self._graph_job(state)
+        prepare_job_preflight(job, self._settings)
+        self._publish_progress(job)
+        return self._graph_update(job, phase="preflight", next_action="continue")
+
     def graph_plan(self, state: WorkflowGraphState) -> dict[str, Any]:
         job = self._graph_job(state)
         if not job.tasks:
@@ -365,7 +473,8 @@ class AgentRuntime:
                 job_id=job.job_id,
                 project_id=job.request.project_id,
             ):
-                planning = self._planner.create_plan(job.request, context)
+                planner = self._planner if is_advanced_job(job) else self._standard_planner
+                planning = planner.create_plan(job.request, context)
                 job.tasks = planning.tasks
                 job.api_contract = planning.api_contract
                 job.request_policy = planning.request_policy.to_dict()
@@ -386,7 +495,12 @@ class AgentRuntime:
                 job_id=job.job_id,
                 project_id=job.request.project_id,
             ):
-                job.design_spec = self._design_director.create_spec(job)
+                director = (
+                    self._design_director
+                    if is_advanced_job(job)
+                    else self._standard_design_director
+                )
+                job.design_spec = director.create_spec(job)
                 self._apply_design_spec(job)
                 self._publish_progress(job)
         return self._graph_update(job, phase="design")
@@ -395,7 +509,6 @@ class AgentRuntime:
         job = self._graph_job(state)
         checkpoint = self._feedback.ensure_product_contract(job)
         if checkpoint is not None:
-            self._publish_progress(job)
             return self._graph_update(
                 job,
                 phase="product_approval",
@@ -408,7 +521,6 @@ class AgentRuntime:
         job = self._graph_job(state)
         checkpoint = self._feedback.ensure_privileged_actions(job)
         if checkpoint is not None:
-            self._publish_progress(job)
             return self._graph_update(
                 job,
                 phase="privileged_approval",
@@ -625,7 +737,8 @@ class AgentRuntime:
             job_id=job.job_id,
             project_id=job.request.project_id,
         ):
-            planning = self._planner.create_plan(job.request, context)
+            planner = self._planner if is_advanced_job(job) else self._standard_planner
+            planning = planner.create_plan(job.request, context)
             job.tasks = planning.tasks
             job.api_contract = planning.api_contract
             job.request_policy = planning.request_policy.to_dict()
@@ -634,6 +747,7 @@ class AgentRuntime:
                 warning for warning in planning.warnings if warning not in job.warnings
             )
             self._record_planning_memory(job)
+        cleanup_media_cache(job, self._settings)
         job.design_spec = {}
         job.worker_results = []
         self._manifest_checkpoints.reset(job)
@@ -655,7 +769,6 @@ class AgentRuntime:
         job = self._graph_job(state)
         checkpoint = self._feedback.ensure_release(job)
         if checkpoint is not None:
-            self._publish_progress(job)
             return self._graph_update(
                 job,
                 phase="release_approval",
@@ -667,6 +780,7 @@ class AgentRuntime:
     def graph_finalize_success(self, state: WorkflowGraphState) -> dict[str, Any]:
         job = self._graph_job(state)
         job.set_status(JobStatus.SUCCEEDED)
+        self.cleanup_transient_media(job)
         metrics.increment("jobs_succeeded")
         route = _route_from_state(
             state,
@@ -690,6 +804,7 @@ class AgentRuntime:
         if route.reason not in job.errors:
             job.errors.append(route.reason)
         job.set_status(JobStatus.FAILED)
+        self.cleanup_transient_media(job)
         metrics.increment("jobs_failed")
         return self._graph_update(
             job,

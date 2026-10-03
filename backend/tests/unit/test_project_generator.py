@@ -1,8 +1,13 @@
 import json
 from pathlib import Path
 
-from software_developer_agent.artifacts.project_generator import ProjectArtifactGenerator
+from software_developer_agent.artifacts.project_generator import (
+    ProjectArtifactGenerator,
+    _docker_compose,
+    _github_actions_ci,
+)
 from software_developer_agent.artifacts.validation import ProjectValidationReport
+from software_developer_agent.capabilities.registry import resolve_project_spec
 from software_developer_agent.config.settings import Settings
 from software_developer_agent.models.job_state import (
     GuardrailFinding,
@@ -49,6 +54,31 @@ def test_project_generator_creates_folder_and_zip(tmp_path) -> None:
     assert (tmp_path / "generated").exists()
     assert folder.metadata["file_count"] > 10
     assert archive.path.endswith(".zip")
+    generated = Path(folder.path)
+    assert (generated / "backend/.python-version").read_text(encoding="utf-8") == "3.11\n"
+    readme = (generated / "README.md").read_text(encoding="utf-8")
+    assert "uv sync --locked" in readme
+    assert "pip install" not in readme
+
+
+def test_generated_python_automation_uses_uv() -> None:
+    files = {
+        "backend/pyproject.toml": (
+            '[project]\nname="demo"\nversion="0.1.0"\nrequires-python=">=3.11"\n'
+            "[dependency-groups]\ntest=[\"pytest==8.3.5\"]\n"
+        ),
+        "backend/src/app/main.py": "app = object()\n",
+    }
+    spec = resolve_project_spec("Build a FastAPI API with Docker and GitHub CI")
+
+    compose = _docker_compose(files, {}, spec)
+    workflow = _github_actions_ci(files, spec)
+
+    assert "ghcr.io/astral-sh/uv:0.12.18-debian-slim" in compose
+    assert "uv sync --locked --group test --no-editable" in compose
+    assert "astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4" in workflow
+    assert "uv run --locked --no-sync python -m pytest" in workflow
+    assert "pip install" not in compose + workflow
 
 
 def test_project_generator_writes_worker_manifest_files(tmp_path) -> None:
@@ -81,6 +111,95 @@ def test_project_generator_writes_worker_manifest_files(tmp_path) -> None:
     assert folder.metadata["source"] == "worker_manifests"
     assert (tmp_path / "generated" / folder.name / "backend/src/app/main.py").exists()
     assert (tmp_path / "generated" / folder.name / "README.md").exists()
+
+
+def test_project_generator_materializes_selected_media_and_records_provenance(
+    tmp_path,
+) -> None:
+    class PassingValidator:
+        def validate(self, root, job):
+            return ProjectValidationReport(passed=True, release_ready=True)
+
+    cache_path = tmp_path / "media-cache" / "frontend-task" / "image" / "asset.png"
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_bytes(b"\x89PNG\r\n\x1a\nasset")
+    web_path = "/assets/media/xpulse.png"
+    project_path = "frontend/public/assets/media/xpulse.png"
+    settings = Settings(
+        app_env="test",
+        artifacts_dir=tmp_path / "artifacts",
+        generated_projects_dir=tmp_path / "generated",
+        media_cache_dir=tmp_path / "media-cache",
+    )
+    task = JobTask(
+        worker_kind=WorkerKind.FRONTEND,
+        title="Frontend",
+        instructions="Add an image",
+        task_id="frontend-task",
+        status=TaskStatus.SUCCEEDED,
+    )
+    job = JobState(request=JobRequest(prompt="Add an Xpulse image"), tasks=[task])
+    job.add_worker_result(
+        WorkerResult(
+            task_id=task.task_id,
+            worker_kind=WorkerKind.FRONTEND,
+            status=TaskStatus.SUCCEEDED,
+            summary="frontend worker completed",
+            output=json.dumps(
+                {
+                    "summary": "Generated frontend.",
+                    "operation": "replace",
+                    "files": [
+                        {
+                            "path": "frontend/src/App.tsx",
+                            "content": f'export default () => <img src="{web_path}" />;\n',
+                        },
+                        {
+                            "path": "frontend/package.json",
+                            "content": '{"scripts":{"test":"vitest"}}',
+                        },
+                    ],
+                }
+            ),
+            tool_calls=[
+                {
+                    "tool": "media_asset_acquisition",
+                    "status": "succeeded",
+                    "metadata": {
+                        "assets": [
+                            {
+                                "kind": "image",
+                                "title": "Xpulse",
+                                "source": "Example",
+                                "source_url": "https://example.com/xpulse",
+                                "remote_url": "https://cdn.example.com/xpulse.png",
+                                "rights_status": "verify-source-terms-before-publication",
+                                "download": {
+                                    "cache_path": str(cache_path),
+                                    "project_path": project_path,
+                                    "web_path": web_path,
+                                    "sha256": "demo",
+                                },
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+    )
+
+    artifacts = ProjectArtifactGenerator(settings, validator=PassingValidator()).generate(job)
+    folder = next(artifact for artifact in artifacts if artifact.kind == "folder")
+    generated = Path(folder.path)
+
+    assert (generated / project_path).read_bytes().startswith(b"\x89PNG")
+    media_manifest = json.loads(
+        (generated / "artifacts/media-assets.json").read_text(encoding="utf-8")
+    )
+    assert media_manifest["assets"][0]["strategy"] == "download"
+    blueprint = json.loads((generated / "artifacts/blueprint.json").read_text(encoding="utf-8"))
+    assert project_path in blueprint["files"]
+    assert folder.metadata["media_assets"][0]["selected_url"] == web_path
 
 
 def test_project_generator_does_not_inject_excluded_infrastructure(tmp_path) -> None:

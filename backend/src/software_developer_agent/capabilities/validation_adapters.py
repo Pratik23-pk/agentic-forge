@@ -164,6 +164,11 @@ def _has_http_denial(runtime: str, status_code: int) -> bool:
             re.IGNORECASE,
         )
         or re.search(
+            rf"\braise\s+[A-Za-z_][A-Za-z0-9_]*\s*\(\s*{status_code}\b",
+            runtime,
+            re.IGNORECASE,
+        )
+        or re.search(
             rf"status\.http_{status_code}_[a-z_]+\b",
             runtime,
             re.IGNORECASE,

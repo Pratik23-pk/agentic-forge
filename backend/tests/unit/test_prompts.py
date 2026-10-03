@@ -32,6 +32,7 @@ def test_system_prompts_enforce_generation_contracts() -> None:
     assert "An explicit exclusion always overrides keyword matching" in PLANNER_SYSTEM_PROMPT
     assert "Never introduce SQLite" in DATABASE_SYSTEM_PROMPT
     assert "Never reference a dependency file that is not generated" in BACKEND_SYSTEM_PROMPT
+    assert "uv sync --locked" in BACKEND_SYSTEM_PROMPT
     assert "EmailStr requires the certified email-validator package" in BACKEND_SYSTEM_PROMPT
     assert "Never use `latest` dependency versions" in FRONTEND_SYSTEM_PROMPT
     assert "import `defineConfig` from `vitest/config`" in FRONTEND_SYSTEM_PROMPT
@@ -47,3 +48,4 @@ def test_system_prompts_enforce_generation_contracts() -> None:
     assert '"replan_required": false' in EVALUATOR_SYSTEM_PROMPT
     assert "Evaluate the final checkpoint" in EVALUATOR_SYSTEM_PROMPT
     assert "Never reference requirements.txt unless it exists" in ARTIFACT_WRITER_SYSTEM_PROMPT
+    assert "never emit pip or python -m venv" in ARTIFACT_WRITER_SYSTEM_PROMPT

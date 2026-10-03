@@ -121,9 +121,15 @@ def privileged_actions_for_job(job: JobState) -> list[dict[str, str]]:
 
 
 def approval_contract(job: JobState) -> dict[str, Any]:
+    public_preflight = {
+        key: value
+        for key, value in job.preflight.items()
+        if key not in {"authorized_budget_usd", "estimated_cost_usd"}
+    }
     return {
         "project_id": job.request.project_id,
         "request": job.request.prompt,
+        "generation_preflight": public_preflight,
         "stack": job.project_spec,
         "design": job.design_spec,
         "workers": [

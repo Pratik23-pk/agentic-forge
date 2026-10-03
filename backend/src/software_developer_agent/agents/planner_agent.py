@@ -264,6 +264,7 @@ class PlannerAgent:
             resolved_policy,
         )
         capability = resolve_capability(resolved_spec.capability_id)
+        user_media = _user_media_context(request)
         return (
             f"Worker: {worker.value}\n"
             f"Project: {context.project_id}\n"
@@ -274,6 +275,11 @@ class PlannerAgent:
             f"Human planning feedback: {json.dumps(_human_planning_feedback(request))}\n"
             f"Stack: {capability.display_name}\n"
             f"Shared API contract: {json.dumps(api_contract or {}, sort_keys=True)}\n"
+            f"Generation profile: {request.metadata.get('effective_generation_profile', 'standard')}\n"
+            f"User media manifest: {json.dumps(user_media, sort_keys=True)}\n"
+            "Media policy: User-provided, permitted downloaded, and verified embedded media may be "
+            "combined when that best satisfies the request. User media never disables web media "
+            "research. Reference only supplied web_path or verified tool URLs; never invent paths.\n"
             f"Known constraints:\n{constraints}\n"
             f"Recent decisions:\n{decisions}"
         )
@@ -318,6 +324,30 @@ def _human_planning_feedback(request: JobRequest) -> list[str]:
         )
         if request.metadata.get(key)
     ]
+
+
+def _user_media_context(request: JobRequest) -> list[dict[str, Any]]:
+    assets = request.metadata.get("uploaded_assets", [])
+    if not isinstance(assets, list):
+        return []
+    context: list[dict[str, Any]] = []
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        downloaded = asset.get("download")
+        if not isinstance(downloaded, dict):
+            continue
+        context.append(
+            {
+                "asset_id": asset.get("asset_id"),
+                "kind": asset.get("kind"),
+                "title": asset.get("title"),
+                "web_path": downloaded.get("web_path"),
+                "mime_type": downloaded.get("mime_type"),
+                "rights_status": asset.get("rights_status"),
+            }
+        )
+    return context
 
 
 def _has_prompt_term(prompt: str, term: str) -> bool:

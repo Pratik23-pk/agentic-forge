@@ -5,8 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from software_developer_agent.api.routes import (
+    explanations,
     health,
     jobs,
+    media,
     metrics,
     previews,
     providers,
@@ -53,6 +55,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router, prefix="/api")
     app.include_router(jobs.router, prefix="/api")
+    app.include_router(explanations.router, prefix="/api")
+    app.include_router(media.router, prefix="/api")
     app.include_router(previews.router, prefix="/api")
     app.include_router(workspace.router, prefix="/api")
     app.include_router(providers.router, prefix="/api")

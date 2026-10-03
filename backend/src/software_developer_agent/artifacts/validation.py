@@ -282,6 +282,26 @@ class ProjectValidator:
                 ):
                     return preparation
 
+            backend = root / "backend"
+            if (backend / "pyproject.toml").exists():
+                lockfile_command = [_uv_executable(), "lock"]
+                lockfile_cwd = backend
+                if self._settings.artifact_validation_sandbox_mode == "docker":
+                    lockfile_command = self._docker_python_lockfile_command(backend)
+                    lockfile_cwd = root
+                result = self._run(
+                    preparation,
+                    name="backend_lockfile_generation",
+                    worker_kind=WorkerKind.BACKEND,
+                    command=lockfile_command,
+                    cwd=lockfile_cwd,
+                    allow_network=True,
+                    phase="dependency_install",
+                    infrastructure_retries=self._settings.artifact_infrastructure_retry_attempts,
+                )
+                if not result.passed:
+                    return preparation
+
         structural = self._validate_structure(root, policy, project_spec)
         structural.checks = [*preparation.checks, *structural.checks]
         structural.results = [*preparation.results, *structural.results]
@@ -429,7 +449,7 @@ class ProjectValidator:
                 image = "node:20-alpine"
             else:
                 script = self._python_sandbox_script(root, component_root, project_spec)
-                image = "python:3.11-slim"
+                image = "ghcr.io/astral-sh/uv:0.12.18-debian-slim"
             self._run(
                 report,
                 name=f"{component}_docker_execution",
@@ -529,27 +549,24 @@ class ProjectValidator:
         component: Path,
         project_spec: ProjectSpec,
     ) -> str:
-        install_target = "."
         if (component / "pyproject.toml").exists():
-            try:
-                pyproject = tomllib.loads(
-                    (component / "pyproject.toml").read_text(encoding="utf-8")
-                )
-            except tomllib.TOMLDecodeError:
-                pyproject = {}
-            extras = pyproject.get("project", {}).get("optional-dependencies", {})
-            for extra in ("test", "tests", "dev"):
-                if extra in extras:
-                    install_target = f".[{extra}]"
-                    break
-            install = f"/tmp/venv/bin/pip install {shlex.quote(install_target)}"
+            sync_command = [
+                "uv",
+                "sync",
+                "--locked",
+                "--no-editable",
+                *_uv_dependency_selection(component / "pyproject.toml"),
+            ]
+            commands = [
+                "env UV_PROJECT_ENVIRONMENT=/tmp/venv " + shlex.join(sync_command),
+                "uv pip check --python /tmp/venv/bin/python",
+            ]
         else:
-            install = "/tmp/venv/bin/pip install -r requirements.txt"
-        commands = [
-            "python -m venv /tmp/venv",
-            install,
-            "/tmp/venv/bin/pip check",
-        ]
+            commands = [
+                "uv venv /tmp/venv --python 3.11",
+                "uv pip install --python /tmp/venv/bin/python -r requirements.txt",
+                "uv pip check --python /tmp/venv/bin/python",
+            ]
         if (component / "tests").exists():
             commands.append("/tmp/venv/bin/python -m pytest -vv --tb=long")
         if project_spec.backend_framework != "Python CLI":
@@ -601,6 +618,10 @@ class ProjectValidator:
             "/tmp:rw,nosuid,nodev,exec,size=1024m",
             "-e",
             "HOME=/tmp/home",
+            "-e",
+            "UV_LINK_MODE=copy",
+            "-e",
+            "UV_NO_PROGRESS=1",
             "-v",
             f"{_docker_mount_path(root / component)}:/source:ro",
             image,
@@ -643,6 +664,41 @@ class ProjectValidator:
             "--package-lock-only",
             "--ignore-scripts",
             "--no-audit",
+        ]
+
+    def _docker_python_lockfile_command(self, component: Path) -> list[str]:
+        return [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            f"agentic-forge-python-lockfile-{uuid4().hex[:12]}",
+            "--network",
+            "bridge",
+            "--cpus",
+            "1.0",
+            "--memory",
+            f"{self._settings.artifact_validation_memory_limit_mb}m",
+            "--pids-limit",
+            "128",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev,exec,size=256m",
+            "-e",
+            "HOME=/tmp/home",
+            "-e",
+            "UV_NO_PROGRESS=1",
+            "-v",
+            f"{_docker_mount_path(component)}:/workspace:rw",
+            "-w",
+            "/workspace",
+            "ghcr.io/astral-sh/uv:0.12.18-debian-slim",
+            "uv",
+            "lock",
         ]
 
     def _validate_structure(
@@ -691,6 +747,15 @@ class ProjectValidator:
                     "backend/package.json, backend/pyproject.toml, or backend/requirements.txt."
                 )
                 retry_targets.add(WorkerKind.BACKEND)
+            if "backend/pyproject.toml" in files:
+                if "backend/uv.lock" not in files:
+                    findings.append("Python backends using pyproject.toml require a uv.lock file.")
+                    retry_targets.add(WorkerKind.BACKEND)
+                if "backend/.python-version" not in files:
+                    findings.append(
+                        "Python backends using pyproject.toml require backend/.python-version."
+                    )
+                    retry_targets.add(WorkerKind.BACKEND)
             if not any(_is_component_test_file(path, "backend") for path in files):
                 findings.append("Backend focused tests are missing.")
                 retry_targets.add(WorkerKind.BACKEND)
@@ -857,33 +922,32 @@ class ProjectValidator:
             report,
             name="backend_virtualenv",
             worker_kind=WorkerKind.BACKEND,
-            command=[sys.executable, "-m", "venv", str(venv)],
+            command=[_uv_executable(), "venv", str(venv), "--python", sys.executable],
             cwd=root,
         )
         if not report.passed:
             return
 
         python = venv / "bin" / "python"
-        if not python.exists():
+        if sys.platform == "win32":
             python = venv / "Scripts" / "python.exe"
+        install_environment: dict[str, str] | None = None
         if (backend / "pyproject.toml").exists():
-            install_target = str(backend)
-            try:
-                pyproject = tomllib.loads((backend / "pyproject.toml").read_text(encoding="utf-8"))
-            except tomllib.TOMLDecodeError:
-                pyproject = {}
-            extras = pyproject.get("project", {}).get("optional-dependencies", {})
-            for extra in ("test", "tests", "dev"):
-                if extra in extras:
-                    install_target = f"{backend}[{extra}]"
-                    break
-            install_command = [str(python), "-m", "pip", "install", install_target]
+            install_command = [
+                _uv_executable(),
+                "sync",
+                "--locked",
+                "--no-editable",
+                *_uv_dependency_selection(backend / "pyproject.toml"),
+            ]
+            install_environment = {"UV_PROJECT_ENVIRONMENT": str(venv)}
         else:
             install_command = [
-                str(python),
-                "-m",
+                _uv_executable(),
                 "pip",
                 "install",
+                "--python",
+                str(python),
                 "-r",
                 str(backend / "requirements.txt"),
             ]
@@ -892,7 +956,8 @@ class ProjectValidator:
             name="backend_install",
             worker_kind=WorkerKind.BACKEND,
             command=install_command,
-            cwd=root,
+            cwd=backend,
+            extra_env=install_environment,
             allow_network=True,
         )
         if not report.passed:
@@ -901,7 +966,7 @@ class ProjectValidator:
             report,
             name="backend_dependency_check",
             worker_kind=WorkerKind.BACKEND,
-            command=[str(python), "-m", "pip", "check"],
+            command=[_uv_executable(), "pip", "check", "--python", str(python)],
             cwd=backend,
         )
         if not report.passed:
@@ -1129,6 +1194,7 @@ class ProjectValidator:
             )
             return
         missing_route_references: list[str] = []
+        method_mismatches: list[str] = []
         for route in routes:
             path = str(route.get("path", ""))
             method = str(route.get("method", "GET")).upper()
@@ -1149,13 +1215,10 @@ class ProjectValidator:
                 _frontend_route_methods(frontend_text, path) if direct_reference else set()
             )
             if direct_reference and referenced_methods and method not in referenced_methods:
-                report.passed = False
-                report.retry_targets = [WorkerKind.FRONTEND]
-                report.failure_reason = (
+                method_mismatches.append(
                     f"Frontend uses {sorted(referenced_methods)} for {path}; "
                     f"the shared contract requires {method}."
                 )
-                return
             query_parameters = [
                 name for name, _ in parse_qsl(urlsplit(path).query, keep_blank_values=True)
             ]
@@ -1226,6 +1289,11 @@ class ProjectValidator:
                 + ", ".join(missing_route_references)
                 + "."
             )
+            return
+        if method_mismatches:
+            report.passed = False
+            report.retry_targets = [WorkerKind.FRONTEND]
+            report.failure_reason = " ".join(method_mismatches)
             return
         report.checks.append("frontend_contract_reference")
 
@@ -1390,6 +1458,7 @@ class ProjectValidator:
             root / "frontend" / ".next",
             root / "backend" / "node_modules",
             root / "backend" / "dist",
+            root / "backend" / ".venv",
             root / "backend" / ".pytest_cache",
         ):
             if path.exists():
@@ -1463,6 +1532,13 @@ def _backend_manifest_findings(
         findings.append(
             "Async SQLAlchemy backends must declare the certified greenlet runtime dependency."
         )
+    if "SessionMiddleware" in backend_runtime and not re.search(
+        r"(?<![A-Za-z0-9_.-])itsdangerous==[^\"'\s,]+",
+        dependency_text,
+    ):
+        findings.append(
+            "Starlette SessionMiddleware requires the certified itsdangerous runtime dependency."
+        )
 
     seed_text = "\n".join(
         content
@@ -1496,7 +1572,7 @@ def _backend_manifest_findings(
             findings.append(
                 "FastAPI full-stack backends must install CORSMiddleware for the generated frontend."
             )
-        elif not re.search(r"\bCORS_ORIGINS?\b", backend_source):
+        elif not re.search(r"\bCORS_ORIGINS?\b", backend_source, re.IGNORECASE):
             findings.append(
                 "FastAPI CORS must consume the documented CORS_ORIGINS setting at runtime; "
                 "fixed localhost origins do not satisfy dynamic preview or deployment ports."
@@ -1803,16 +1879,16 @@ def _readme_consistency_findings(files: dict[str, Path], readme: str) -> list[st
     findings: list[str] = []
     normalized = readme.lower()
     if "backend/requirements.txt" in files:
-        if "pip install -r requirements.txt" not in normalized:
-            findings.append("README.md must install backend/requirements.txt with pip install -r.")
-        if "pip install ." in normalized or "pip install -e ." in normalized:
+        if not re.search(r"uv\s+pip\s+install[^\r\n]*-r\s+requirements\.txt", normalized):
+            findings.append("README.md must install backend/requirements.txt with uv pip install -r.")
+        if "uv sync" in normalized:
             findings.append(
                 "README.md documents pyproject installation but backend uses requirements.txt."
             )
     if "backend/pyproject.toml" in files:
         if not _documents_pyproject_install(normalized):
             findings.append("README.md must install the backend from backend/pyproject.toml.")
-        if "pip install -r requirements" in normalized:
+        if re.search(r"(?:uv\s+)?pip\s+install[^\r\n]*-r\s+requirements", normalized):
             findings.append(
                 "README.md references requirements.txt but backend uses pyproject.toml."
             )
@@ -1844,12 +1920,7 @@ def _readme_consistency_findings(files: dict[str, Path], readme: str) -> list[st
 
 
 def _documents_pyproject_install(readme: str) -> bool:
-    return bool(
-        re.search(
-            r"pip\s+install\s+(?:-e\s+)?[\"']?\.(?:\[[^\]\r\n]+\])?[\"']?",
-            readme,
-        )
-    )
+    return bool(re.search(r"\buv\s+sync\b", readme))
 
 
 def _documented_path_exists(referenced_path: str, files: dict[str, Path]) -> bool:
@@ -1858,7 +1929,8 @@ def _documented_path_exists(referenced_path: str, files: dict[str, Path]) -> boo
     if referenced_path.endswith("/.env"):
         return f"{referenced_path}.example" in files
     if "/" in referenced_path:
-        return False
+        basename = PurePath(referenced_path).name
+        return "." not in basename and basename not in {"Dockerfile", "Makefile", "Procfile"}
     return any(
         f"{component}/{referenced_path}" in files
         for component in ("backend", "frontend", "database")
@@ -1989,6 +2061,38 @@ def _npm_executable() -> str:
     raise RuntimeError("npm is required for frontend validation.")
 
 
+def _uv_executable() -> str:
+    uv = shutil.which("uv")
+    if uv:
+        return uv
+    for candidate in (
+        Path.home() / ".local" / "bin" / "uv",
+        Path("/opt/homebrew/bin/uv"),
+        Path("/usr/local/bin/uv"),
+    ):
+        if candidate.exists():
+            return str(candidate)
+    raise RuntimeError("uv is required for Python dependency management and validation.")
+
+
+def _uv_dependency_selection(pyproject_path: Path) -> list[str]:
+    try:
+        payload = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    groups = payload.get("dependency-groups", {})
+    if isinstance(groups, dict):
+        for group in ("test", "tests", "dev"):
+            if group in groups:
+                return ["--group", group]
+    extras = payload.get("project", {}).get("optional-dependencies", {})
+    if isinstance(extras, dict):
+        for extra in ("test", "tests", "dev"):
+            if extra in extras:
+                return ["--extra", extra]
+    return []
+
+
 def _validation_environment(
     extra: dict[str, str] | None = None,
     *,
@@ -2006,6 +2110,8 @@ def _validation_environment(
             "NPM_CONFIG_FUND": "false",
             "PIP_DISABLE_PIP_VERSION_CHECK": "1",
             "PYTHONDONTWRITEBYTECODE": "1",
+            "UV_LINK_MODE": "copy",
+            "UV_NO_PROGRESS": "1",
         }
     )
     if not allow_network:
@@ -2155,6 +2261,18 @@ def _frontend_route_methods(frontend_text: str, route_path: str) -> set[str]:
             explicit_methods.add(method_match.group(1).upper())
         if explicit_methods:
             methods.update(explicit_methods)
+            continue
+        init_factory_methods = {
+            factory_match.group(1).upper()
+            for factory_match in re.finditer(
+                r"\b[A-Za-z_$][A-Za-z0-9_$]*\s*\(\s*['\"]"
+                r"(GET|POST|PUT|PATCH|DELETE)['\"]",
+                window,
+                flags=re.IGNORECASE,
+            )
+        }
+        if init_factory_methods:
+            methods.update(init_factory_methods)
             continue
         wrapper_methods = _frontend_call_wrapper_methods(expanded_text, match.start())
         methods.update(wrapper_methods or {"GET"})

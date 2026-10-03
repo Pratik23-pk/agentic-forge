@@ -388,6 +388,8 @@ def normalize_worker_manifest(
         _inject_missing_runtime_contracts(manifest, capability_id)
         _inject_missing_environment_examples(manifest)
         _normalize_python_source_layout(manifest)
+    _normalize_python_build_contract(manifest)
+    _normalize_python_password_hash_contracts(manifest)
     _normalize_python_dependency_contracts(manifest)
     _normalize_frontend_test_contracts(manifest, capability_id)
     _normalize_frontend_typescript_contracts(manifest, capability_id)
@@ -487,6 +489,56 @@ def _normalize_python_source_layout(manifest: WorkerFileManifest) -> None:
     ]
 
 
+def _normalize_python_build_contract(manifest: WorkerFileManifest) -> None:
+    if manifest.worker_kind != WorkerKind.BACKEND:
+        return
+    pyproject = next(
+        (file for file in manifest.files if file.path == "backend/pyproject.toml"),
+        None,
+    )
+    if pyproject is None:
+        return
+    build_section = (
+        '[build-system]\nrequires = ["hatchling==1.27.0"]\n'
+        'build-backend = "hatchling.build"\n\n'
+    )
+    section_match = re.search(
+        r"(?ms)^\[build-system\]\s*\n.*?(?=^\[[^\n]+\]\s*$|\Z)",
+        pyproject.content,
+    )
+    allowed_backend = re.search(
+        r'(?m)^\s*build-backend\s*=\s*"(?:hatchling\.build|setuptools\.build_meta|flit_core\.buildapi)"\s*$',
+        section_match.group(0) if section_match else "",
+    )
+    if section_match is None:
+        pyproject.content = build_section + pyproject.content.lstrip()
+    elif allowed_backend is None:
+        pyproject.content = (
+            pyproject.content[: section_match.start()]
+            + build_section
+            + pyproject.content[section_match.end() :].lstrip()
+        )
+    if "[tool.hatch.build.targets.wheel]" in pyproject.content:
+        return
+    package_roots = sorted(
+        {
+            "/".join(PurePosixPath(file.path).parts[1:3])
+            for file in manifest.files
+            if file.path.startswith("backend/src/")
+            and PurePosixPath(file.path).name == "__init__.py"
+            and len(PurePosixPath(file.path).parts) >= 4
+        }
+    )
+    if not package_roots:
+        return
+    packages = ", ".join(json.dumps(root) for root in package_roots)
+    pyproject.content = (
+        pyproject.content.rstrip()
+        + "\n\n[tool.hatch.build.targets.wheel]\n"
+        + f"packages = [{packages}]\n"
+    )
+
+
 def _normalize_python_dependency_contracts(manifest: WorkerFileManifest) -> None:
     if manifest.worker_kind != WorkerKind.BACKEND:
         return
@@ -509,6 +561,7 @@ def _normalize_python_dependency_contracts(manifest: WorkerFileManifest) -> None
             "create_async_engine",
         )
     )
+    requires_itsdangerous = "SessionMiddleware" in source_text
     for file in manifest.files:
         if file.path not in {"backend/pyproject.toml", "backend/requirements.txt"}:
             continue
@@ -524,6 +577,41 @@ def _normalize_python_dependency_contracts(manifest: WorkerFileManifest) -> None
                 file.path,
                 "greenlet==3.1.1",
             )
+        if requires_itsdangerous:
+            file.content = _ensure_python_requirement(
+                file.content,
+                file.path,
+                "itsdangerous==2.2.0",
+            )
+
+
+def _normalize_python_password_hash_contracts(manifest: WorkerFileManifest) -> None:
+    if manifest.worker_kind != WorkerKind.BACKEND:
+        return
+    for file in manifest.files:
+        path = PurePosixPath(file.path)
+        if path.suffix != ".py" or "tests" in path.parts:
+            continue
+        if "PasswordHash.recommended()" not in file.content:
+            continue
+        file.content = file.content.replace(
+            "PasswordHash.recommended()",
+            "PasswordHash((Argon2Hasher(), BcryptHasher()))",
+        )
+        imports = []
+        if "from pwdlib.hashers.argon2 import Argon2Hasher" not in file.content:
+            imports.append("from pwdlib.hashers.argon2 import Argon2Hasher")
+        if "from pwdlib.hashers.bcrypt import BcryptHasher" not in file.content:
+            imports.append("from pwdlib.hashers.bcrypt import BcryptHasher")
+        if not imports:
+            continue
+        password_import = re.search(r"(?m)^from pwdlib import PasswordHash\s*$", file.content)
+        insertion = "\n".join(imports) + "\n"
+        if password_import is None:
+            file.content = insertion + file.content
+            continue
+        offset = password_import.end()
+        file.content = file.content[:offset] + "\n" + insertion + file.content[offset:]
 
 
 def _merge_python_requirement_extras(
@@ -1063,8 +1151,13 @@ def _fallback_validation_commands(worker_kind: WorkerKind) -> list[str]:
     if worker_kind == WorkerKind.DATABASE:
         return ["sqlite3 backend/local_app.sqlite3 < database/migrations/001_initial.sql"]
     if worker_kind == WorkerKind.FRONTEND:
-        return ["cd frontend && npm install && npm run build"]
-    return ["cd backend && pip install -e '.[dev]' && pytest"]
+        return ["cd frontend && npm ci && npm run build"]
+    return [
+        (
+            "cd backend && uv sync --locked --group dev --no-editable "
+            "&& uv run --locked --no-sync python -m pytest"
+        )
+    ]
 
 
 def _sqlite_migration() -> str:
@@ -1129,12 +1222,12 @@ def _backend_pyproject(project_id: str) -> str:
         version = "0.1.0"
         requires-python = ">=3.11"
         dependencies = [
-          "fastapi>=0.115.0",
-          "uvicorn[standard]>=0.30.6"
+          "fastapi==0.115.12",
+          "uvicorn[standard]==0.34.2"
         ]
 
-        [project.optional-dependencies]
-        dev = ["httpx>=0.27.0", "pytest>=8.3.0"]
+        [dependency-groups]
+        dev = ["httpx==0.28.1", "pytest==8.3.5"]
 
         [build-system]
         requires = ["hatchling"]

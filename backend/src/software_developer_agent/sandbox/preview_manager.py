@@ -9,7 +9,6 @@ import subprocess
 import sys
 import threading
 import time
-import tomllib
 import urllib.error
 import urllib.request
 from contextlib import ExitStack
@@ -262,7 +261,7 @@ class PreviewManager:
         if backend.exists() and spec.backend_framework not in {None, "Python CLI"}:
             port = self._available_port(preferred_backend)
             backend_url = f"http://{self._settings.preview_host}:{port}"
-            environment = {"PORT": str(port)}
+            environment = {**_preview_backend_environment(backend), "PORT": str(port)}
             if (backend / "package.json").exists():
                 command = [_npm_executable(), "run", "dev"]
             else:
@@ -372,27 +371,28 @@ class PreviewManager:
             if (Path(python).parent / ".ready").exists():
                 return
             if (component / "pyproject.toml").exists():
-                target = str(component)
-                try:
-                    payload = tomllib.loads((component / "pyproject.toml").read_text())
-                except tomllib.TOMLDecodeError:
-                    payload = {}
-                extras = payload.get("project", {}).get("optional-dependencies", {})
-                for extra in ("dev", "test", "tests"):
-                    if extra in extras:
-                        target = f"{component}[{extra}]"
-                        break
-                command = [str(python), "-m", "pip", "install", target]
+                command = [
+                    _uv_executable(),
+                    "sync",
+                    "--locked",
+                    "--no-dev",
+                    "--no-editable",
+                    "--project",
+                    str(component),
+                ]
+                environment = {"UV_PROJECT_ENVIRONMENT": str(Path(python).parent.parent)}
             else:
                 command = [
-                    str(python),
-                    "-m",
+                    _uv_executable(),
                     "pip",
                     "install",
+                    "--python",
+                    str(python),
                     "-r",
                     str(component / "requirements.txt"),
                 ]
-            self._run_install(command, component)
+                environment = None
+            self._run_install(command, component, environment)
             (Path(python).parent / ".ready").touch()
         return None
 
@@ -425,18 +425,27 @@ class PreviewManager:
             )
         elif (component / "pyproject.toml").exists():
             content = (
-                "FROM python:3.11-slim\n"
+                "FROM ghcr.io/astral-sh/uv:0.12.18-debian-slim\n"
                 "WORKDIR /workspace\n"
+                "ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy "
+                "UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PROJECT_ENVIRONMENT=/opt/venv "
+                "PATH=/opt/venv/bin:$PATH\n"
+                "COPY pyproject.toml uv.lock .python-version /workspace/\n"
+                "RUN uv sync --locked --no-dev --no-install-project --no-editable\n"
                 "COPY . /workspace\n"
-                "RUN python -m pip install --no-cache-dir .\n"
+                "RUN uv sync --locked --no-dev --no-editable "
+                "&& chmod -R a+rX /opt/uv /opt/venv\n"
                 "USER 65534:65534\n"
             )
         else:
             content = (
-                "FROM python:3.11-slim\n"
+                "FROM ghcr.io/astral-sh/uv:0.12.18-debian-slim\n"
                 "WORKDIR /workspace\n"
+                "ENV UV_LINK_MODE=copy PATH=/opt/venv/bin:$PATH\n"
                 "COPY . /workspace\n"
-                "RUN python -m pip install --no-cache-dir -r requirements.txt\n"
+                "RUN uv venv /opt/venv --python 3.11 && "
+                "uv pip install --python /opt/venv/bin/python "
+                "-r requirements.txt\n"
                 "USER 65534:65534\n"
             )
         dockerfile.write_text(content, encoding="utf-8")
@@ -493,14 +502,24 @@ class PreviewManager:
             python = venv / "Scripts" / "python.exe"
         if not python.exists():
             venv.parent.mkdir(parents=True, exist_ok=True)
-            self._run_install([sys.executable, "-m", "venv", str(venv)], component)
+            self._run_install(
+                [_uv_executable(), "venv", str(venv), "--python", sys.executable],
+                component,
+            )
         return python
 
-    def _run_install(self, command: list[str], cwd: Path) -> None:
+    def _run_install(
+        self,
+        command: list[str],
+        cwd: Path,
+        environment: dict[str, str] | None = None,
+    ) -> None:
+        safe_environment = self._safe_environment()
+        safe_environment.update(environment or {})
         result = subprocess.run(
             command,
             cwd=cwd,
-            env=self._safe_environment(),
+            env=safe_environment,
             capture_output=True,
             text=True,
             timeout=self._settings.preview_install_timeout_seconds,
@@ -821,7 +840,7 @@ class PreviewManager:
             [
                 image,
                 "sh",
-                "-lc",
+                "-c",
                 command_text,
             ]
         )
@@ -1011,7 +1030,13 @@ class PreviewManager:
             key: value
             for key, value in os.environ.items()
             if key in {"HOME", "LANG", "LC_ALL", "PATH", "SYSTEMROOT", "TMPDIR"}
-        } | {"CI": "1", "NODE_ENV": "development", "PYTHONDONTWRITEBYTECODE": "1"}
+        } | {
+            "CI": "1",
+            "NODE_ENV": "development",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "UV_LINK_MODE": "copy",
+            "UV_NO_PROGRESS": "1",
+        }
 
 
 def _backend_module(backend: Path) -> str:
@@ -1024,6 +1049,66 @@ def _backend_module(backend: Path) -> str:
 
 def _npm_executable() -> str:
     return "npm.cmd" if sys.platform == "win32" else "npm"
+
+
+def _uv_executable() -> str:
+    uv = shutil.which("uv")
+    if uv:
+        return uv
+    for candidate in (
+        Path.home() / ".local" / "bin" / "uv",
+        Path("/opt/homebrew/bin/uv"),
+        Path("/usr/local/bin/uv"),
+    ):
+        if candidate.exists():
+            return str(candidate)
+    raise RuntimeError("uv is required for Python preview environments.")
+
+
+def _preview_backend_environment(backend: Path) -> dict[str, str]:
+    env_example = backend / ".env.example"
+    if not env_example.exists():
+        return {}
+    names = {
+        line.split("=", maxsplit=1)[0].strip()
+        for line in env_example.read_text(encoding="utf-8", errors="replace").splitlines()
+        if "=" in line
+        and line.split("=", maxsplit=1)[0].strip()
+        and not line.lstrip().startswith("#")
+    }
+    values: dict[str, str] = {}
+    for name in names:
+        upper = name.upper()
+        if upper == "DATABASE_URL":
+            values[name] = "sqlite+pysqlite:////tmp/agentic-forge-preview.db"
+        elif upper in {"UPLOAD_DIR", "MEDIA_DIR", "MEDIA_ROOT", "STORAGE_DIR"}:
+            values[name] = "/tmp/agentic-forge-media"
+        elif upper.endswith(("_URL", "_ORIGIN")):
+            values[name] = "http://127.0.0.1:9"
+        elif any(marker in upper for marker in ("KEY", "PASSWORD", "SECRET", "TOKEN")):
+            values[name] = "preview-only-not-a-real-secret-0123456789abcdef0123456789abcdef"
+        elif any(
+            marker in upper
+            for marker in (
+                "_COUNT",
+                "_DAYS",
+                "_HOURS",
+                "_LIMIT",
+                "_MAX",
+                "_MINUTES",
+                "_PORT",
+                "_SECONDS",
+                "_SIZE",
+                "_TIMEOUT",
+                "_TTL",
+            )
+        ):
+            values[name] = "1"
+        elif upper.startswith(("ENABLE_", "IS_")) or upper.endswith(("_ENABLED", "_SECURE")):
+            values[name] = "false"
+        else:
+            values[name] = "preview"
+    return values
 
 
 def _http_is_ready(url: str, *, allow_not_found: bool = False) -> bool:

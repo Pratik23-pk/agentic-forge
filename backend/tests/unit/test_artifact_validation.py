@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from software_developer_agent.artifacts.validation import (
     ProjectValidationReport,
     ProjectValidator,
-    _backend_runtime_connectivity_findings,
     _backend_manifest_findings,
     _backend_references_query_parameter,
+    _backend_runtime_connectivity_findings,
     _documented_path_exists,
     _documents_pyproject_install,
     _excerpt,
@@ -159,6 +159,27 @@ def test_backend_manifest_requires_greenlet_for_async_sqlalchemy() -> None:
     assert "Async SQLAlchemy backends must declare the certified greenlet runtime dependency." in findings
 
 
+def test_backend_manifest_requires_itsdangerous_for_session_middleware() -> None:
+    files = {"backend/pyproject.toml": Path("backend/pyproject.toml")}
+    text_files = {
+        "backend/pyproject.toml": _valid_backend_pyproject("fastapi==0.115.6"),
+        "backend/src/app/main.py": (
+            "from starlette.middleware.sessions import SessionMiddleware\n"
+            "from fastapi.middleware.cors import CORSMiddleware\n"
+            "app.add_middleware(CORSMiddleware, "
+            "allow_origins=['http://localhost:5173','http://127.0.0.1:5173'])\n"
+        ),
+    }
+
+    findings = _backend_manifest_findings(
+        files,
+        text_files,
+        resolve_project_spec("Build a React and FastAPI application"),
+    )
+
+    assert any("SessionMiddleware requires" in finding for finding in findings)
+
+
 def test_backend_manifest_rejects_bcrypt_seeds_with_argon2_only_runtime() -> None:
     files = {"backend/pyproject.toml": Path("backend/pyproject.toml")}
     text_files = {
@@ -236,6 +257,31 @@ def test_backend_manifest_accepts_documented_dynamic_cors_origins() -> None:
             "from fastapi.middleware.cors import CORSMiddleware\n"
             "CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173').split(',')\n"
             "app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS)\n"
+        ),
+        "backend/.env.example": "CORS_ORIGINS=http://localhost:5173\n",
+    }
+
+    findings = _backend_manifest_findings(
+        files,
+        text_files,
+        resolve_project_spec("Build a React and FastAPI application"),
+    )
+
+    assert not any("CORS" in finding for finding in findings)
+
+
+def test_backend_manifest_accepts_pydantic_settings_cors_field() -> None:
+    files = {"backend/pyproject.toml": Path("backend/pyproject.toml")}
+    text_files = {
+        "backend/pyproject.toml": _valid_backend_pyproject("fastapi==0.115.6"),
+        "backend/src/app/main.py": (
+            "from pydantic_settings import BaseSettings\n"
+            "from fastapi.middleware.cors import CORSMiddleware\n"
+            "class Settings(BaseSettings):\n"
+            "    cors_origins: str = 'http://localhost:5173'\n"
+            "settings = Settings()\n"
+            "origins = settings.cors_origins.split(',')\n"
+            "app.add_middleware(CORSMiddleware, allow_origins=origins)\n"
         ),
         "backend/.env.example": "CORS_ORIGINS=http://localhost:5173\n",
     }
@@ -382,6 +428,8 @@ def test_python_smoke_environment_does_not_change_test_environment(tmp_path) -> 
     script = validator._python_sandbox_script(tmp_path, backend, spec)
 
     assert "/tmp/venv/bin/python -m pytest -vv --tb=long && env JWT_SECRET=" in script
+    assert "uv sync --locked --no-editable" in script
+    assert "pip install" not in script
 
 
 def test_docker_execution_retries_transient_infrastructure(tmp_path, monkeypatch) -> None:
@@ -749,6 +797,15 @@ def test_frontend_contract_infers_method_from_typed_request_wrapper() -> None:
     assert _frontend_route_methods(frontend_source, "/api/games") == {"POST"}
 
 
+def test_frontend_contract_infers_method_from_request_init_factory() -> None:
+    frontend_source = """
+    const json = (method: string, data?: unknown): RequestInit => ({ method });
+    export const logout = () => request('/api/auth/logout', json('POST'));
+    """
+
+    assert _frontend_route_methods(frontend_source, "/api/auth/logout") == {"POST"}
+
+
 def test_frontend_contract_does_not_borrow_method_from_variable_routes() -> None:
     frontend_source = (
         "const api={products:()=>request('/api/products'),"
@@ -853,8 +910,14 @@ def test_readme_local_env_path_resolves_to_committed_example(tmp_path) -> None:
     )
 
 
-def test_readme_pyproject_install_accepts_optional_dependency_group() -> None:
-    assert _documents_pyproject_install('python -m pip install ".[test]"')
+def test_readme_prose_with_component_slash_is_not_treated_as_missing_file() -> None:
+    assert _documented_path_exists("backend/API", {})
+    assert not _documented_path_exists("backend/src/main.py", {})
+
+
+def test_readme_pyproject_install_requires_uv_sync() -> None:
+    assert _documents_pyproject_install("uv sync --locked --group test")
+    assert not _documents_pyproject_install('python -m pip install ".[test]"')
 
 
 def test_validator_rejects_unpinned_frontend_dependencies(tmp_path) -> None:
@@ -1162,6 +1225,42 @@ def test_auth_adapter_recognizes_domain_error_helper(tmp_path) -> None:
     )
     spec = resolve_project_spec(
         "Build a wallet commerce app with login and an admin-only dashboard",
+        {"capability_id": "react-fastapi"},
+    )
+
+    result = validate_with_adapters(tmp_path, spec)
+
+    assert "server_authorization_unproven" not in {
+        finding.code for finding in result.blocking_findings
+    }
+
+
+def test_auth_adapter_recognizes_custom_raised_http_error_factory(tmp_path) -> None:
+    (tmp_path / "backend/app").mkdir(parents=True)
+    (tmp_path / "backend/tests").mkdir(parents=True)
+    (tmp_path / "backend/app/main.py").write_text(
+        (
+            "def fail(status_code, message): return HTTPException(status_code, message)\n"
+            "def current_user(authorization):\n"
+            "    if not authorization.startswith('Bearer '):\n"
+            "        raise fail(401, 'Authentication required')\n"
+            "    return jwt.decode(authorization[7:], 'secret', algorithms=['HS256'])\n"
+            "def administrator(user):\n"
+            "    if user.role != 'administrator':\n"
+            "        raise fail(403, 'Administrator required')\n"
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "backend/tests/test_api.py").write_text(
+        (
+            "def test_auth_and_role_rejections(client):\n"
+            "    assert client.get('/admin').status_code == 401\n"
+            "    assert client.get('/admin', headers={'Authorization': 'Bearer member'}).status_code == 403\n"
+        ),
+        encoding="utf-8",
+    )
+    spec = resolve_project_spec(
+        "Build a website with login and an administrator dashboard",
         {"capability_id": "react-fastapi"},
     )
 

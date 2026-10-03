@@ -47,12 +47,12 @@ class HumanFeedbackCoordinator:
         return self._create_request(
             job,
             gate=ApprovalGate.PRODUCT_CONTRACT,
-            title="Approve the product contract",
+            title="Approve scope and workflow",
             prompt=(
-                "Confirm the product scope, stack, experience direction, workers, and API contract "
-                "before implementation begins."
+                "Confirm the requested scope, recommended generation profile, and uploaded-media "
+                "plan before planning and implementation begins."
             ),
-            summary="Planning and visual direction are complete.",
+            summary="Deterministic preflight is complete; paid generation has not started.",
             visual_content=json.dumps(contract, indent=2),
             metadata={"contract": contract, "required": True},
         )
@@ -109,7 +109,6 @@ class HumanFeedbackCoordinator:
                 {"kind": artifact.kind, "name": artifact.name, "url": artifact.url}
                 for artifact in job.artifacts
             ],
-            "cost": job.cost_ledger,
         }
         return self._create_request(
             job,
@@ -157,6 +156,7 @@ class HumanFeedbackCoordinator:
             {"checkpoint_id": request.checkpoint_id, "response": response},
         )
         if request.gate == ApprovalGate.PRODUCT_CONTRACT:
+            job.cost_ledger = {}
             _reset_for_replan(job, "product_contract_feedback", response)
         elif request.gate == ApprovalGate.PRIVILEGED_ACTION:
             denied = [
@@ -255,6 +255,7 @@ def _reject_prohibited_feedback(job: JobState, response: str) -> None:
 def _reset_for_replan(job: JobState, metadata_key: str, response: str | None) -> None:
     feedback = response or "Revise the plan using the human checkpoint decision."
     job.request.metadata[metadata_key] = feedback
+    job.preflight = {}
     job.manifest_generation += 1
     job.tasks = []
     job.worker_results = []

@@ -37,6 +37,7 @@ from software_developer_agent.models.job_state import (
 )
 from software_developer_agent.models.request_policy import RequestPolicy, derive_request_policy
 from software_developer_agent.prompts.system_prompts import ARTIFACT_WRITER_SYSTEM_PROMPT
+from software_developer_agent.tools.media_assets import materialize_selected_media_assets
 
 
 @dataclass(slots=True)
@@ -49,6 +50,7 @@ class GeneratedProject:
     validation: ProjectValidationReport
     release_status: ReleaseStatus
     risk_findings: list[dict[str, object]]
+    media_assets: list[dict[str, Any]]
 
 
 class ProjectArtifactGenerator:
@@ -75,6 +77,7 @@ class ProjectArtifactGenerator:
             "release_status": project.release_status.value,
             "publish_allowed": project.release_status == ReleaseStatus.VERIFIED,
             "risk_findings": project.risk_findings,
+            "media_assets": project.media_assets,
         }
         return [
             JobArtifact(
@@ -115,6 +118,31 @@ class ProjectArtifactGenerator:
                 destination = staging_dir / relative_path
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text(content, encoding="utf-8")
+
+            media_assets = materialize_selected_media_assets(
+                job,
+                self._settings,
+                staging_dir,
+                files,
+            )
+            if media_assets:
+                media_manifest = staging_dir / "artifacts" / "media-assets.json"
+                media_manifest.parent.mkdir(parents=True, exist_ok=True)
+                media_manifest.write_text(
+                    json.dumps(
+                        {
+                            "assets": media_assets,
+                            "notice": (
+                                "Publication remains subject to the recorded source terms and "
+                                "attribution requirements."
+                            ),
+                        },
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                _extend_blueprint_with_media(staging_dir, media_assets)
 
             try:
                 validation = self._validator.validate(staging_dir, job)
@@ -179,6 +207,7 @@ class ProjectArtifactGenerator:
             validation=validation,
             release_status=release.status,
             risk_findings=release.findings,
+            media_assets=media_assets,
         )
 
 
@@ -268,6 +297,30 @@ def _validation_release_reason(validation: ProjectValidationReport) -> str | Non
     )
 
 
+def _extend_blueprint_with_media(
+    project_root: Path,
+    media_assets: list[dict[str, Any]],
+) -> None:
+    blueprint_path = project_root / "artifacts" / "blueprint.json"
+    if not blueprint_path.is_file():
+        return
+    try:
+        blueprint = json.loads(blueprint_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    files = blueprint.get("files")
+    if not isinstance(files, list):
+        return
+    additions = ["artifacts/media-assets.json"]
+    additions.extend(
+        str(asset["project_path"])
+        for asset in media_assets
+        if isinstance(asset.get("project_path"), str) and asset["project_path"]
+    )
+    blueprint["files"] = sorted({str(path) for path in [*files, *additions]})
+    blueprint_path.write_text(json.dumps(blueprint, indent=2) + "\n", encoding="utf-8")
+
+
 def _fallback_project_files(job: JobState) -> dict[str, str]:
     specs = []
     for task in job.tasks:
@@ -306,6 +359,11 @@ def _with_project_support_files(
         supported["backend/package-lock.json"] = _placeholder_package_lock(
             supported["backend/package.json"]
         )
+    if "backend/pyproject.toml" in supported:
+        supported.setdefault(
+            "backend/.python-version",
+            _backend_python_version(supported) + "\n",
+        )
     project_spec = (
         ProjectSpec.from_dict(job.project_spec)
         if job.project_spec
@@ -332,6 +390,9 @@ def _with_project_support_files(
             ".github/workflows/ci.yml",
             _github_actions_ci(supported, project_spec),
         )
+    blueprint_files = [*supported, "artifacts/blueprint.json"]
+    if "backend/pyproject.toml" in supported:
+        blueprint_files.append("backend/uv.lock")
     blueprint = {
         "project": project_name,
         "project_id": job.request.project_id,
@@ -348,7 +409,7 @@ def _with_project_support_files(
             }
             for task in job.tasks
         ],
-        "files": sorted([*supported, "artifacts/blueprint.json"]),
+        "files": sorted(set(blueprint_files)),
     }
     supported["artifacts/blueprint.json"] = json.dumps(blueprint, indent=2) + "\n"
     return supported
@@ -414,7 +475,7 @@ def _readme(
         resolved_spec.ports.get("frontend", resolved_spec.ports.get("application", 5173)),
     )
     if python_backend:
-        sections.append("- Python 3.11 or newer")
+        sections.extend(["- Python 3.11 or newer", "- uv 0.12.18 or newer"])
     if has_frontend or node_backend:
         sections.extend(["- Node.js 20 or newer", "- npm 10 or newer"])
     if has_database:
@@ -444,11 +505,12 @@ def _readme(
             )
         else:
             install_command = _backend_install_command(files)
+            python_runner = _backend_python_runner(files)
             run_command = (
                 _python_cli_command(files)
                 if python_cli
                 else (
-                    f"python -m uvicorn {_backend_module(files)}:app --host 127.0.0.1 "
+                    f"{python_runner} -m uvicorn {_backend_module(files)}:app --host 127.0.0.1 "
                     f"--port {backend_port}"
                 )
             )
@@ -459,8 +521,6 @@ def _readme(
                     "",
                     "```bash",
                     "cd backend",
-                    "python3.11 -m venv .venv",
-                    "source .venv/bin/activate",
                     install_command,
                     run_command,
                     "```",
@@ -469,8 +529,7 @@ def _readme(
                     "",
                     "```bash",
                     "cd backend",
-                    "source .venv/bin/activate",
-                    "python -m pytest",
+                    f"{python_runner} -m pytest",
                     "```",
                 ]
             )
@@ -599,28 +658,42 @@ def _readme(
 
 def _backend_install_command(files: dict[str, str]) -> str:
     if "backend/requirements.txt" in files:
-        return "python -m pip install -r requirements.txt"
+        python_version = _backend_python_version(files)
+        return (
+            f"uv venv --python {python_version} && "
+            "uv pip install --python .venv/bin/python -r requirements.txt"
+        )
     pyproject = files.get("backend/pyproject.toml", "")
     try:
         payload = tomllib.loads(pyproject)
     except tomllib.TOMLDecodeError:
-        return "python -m pip install ."
+        return "uv sync --locked --no-editable"
+    groups = payload.get("dependency-groups", {})
+    for group in ("test", "tests", "dev"):
+        if group in groups:
+            return f"uv sync --locked --group {group} --no-editable"
     extras = payload.get("project", {}).get("optional-dependencies", {})
     for extra in ("test", "tests", "dev"):
         if extra in extras:
-            return f'python -m pip install ".[{extra}]"'
-    return "python -m pip install ."
+            return f"uv sync --locked --extra {extra} --no-editable"
+    return "uv sync --locked --no-editable"
+
+
+def _backend_python_runner(files: dict[str, str]) -> str:
+    if "backend/pyproject.toml" in files:
+        return "uv run --locked --no-sync python"
+    return ".venv/bin/python"
 
 
 def _python_cli_command(files: dict[str, str]) -> str:
     try:
         payload = tomllib.loads(files.get("backend/pyproject.toml", ""))
     except tomllib.TOMLDecodeError:
-        return "python -m app"
+        return f"{_backend_python_runner(files)} -m app"
     scripts = payload.get("project", {}).get("scripts", {})
     if isinstance(scripts, dict) and scripts:
-        return str(next(iter(scripts))) + " --help"
-    return "python -m app"
+        return "uv run --locked --no-sync " + str(next(iter(scripts))) + " --help"
+    return f"{_backend_python_runner(files)} -m app"
 
 
 def _backend_module(files: dict[str, str]) -> str:
@@ -729,15 +802,15 @@ def _docker_compose(
                 ).rstrip()
             )
         else:
-            install_command = _backend_install_command(files).replace("python -m ", "")
-            python_version = _backend_python_version(files)
+            install_command = _backend_install_command(files)
+            python_runner = _backend_python_runner(files)
             if project_spec.backend_framework == "Python CLI":
                 command = f"{install_command} && {_python_cli_command(files)}"
                 ports = ""
             else:
                 module = _backend_module(files)
                 command = (
-                    f"{install_command} && python -m uvicorn {module}:app "
+                    f"{install_command} && {python_runner} -m uvicorn {module}:app "
                     f"--host 0.0.0.0 --port {backend_port}"
                 )
                 ports = f'\n    ports:\n      - "{backend_port}:{backend_port}"'
@@ -745,9 +818,12 @@ def _docker_compose(
                 dedent(
                     f"""
                       backend:
-                        image: python:{python_version}-slim
+                        image: ghcr.io/astral-sh/uv:0.12.18-debian-slim
                         working_dir: /app/backend
                         command: sh -c "{command}"
+                        environment:
+                          UV_LINK_MODE: copy
+                          UV_NO_PROGRESS: "1"
                         volumes:
                           - .:/app{ports}
                     """
@@ -784,14 +860,27 @@ def _github_actions_ci(files: dict[str, str], project_spec: ProjectSpec) -> str:
             steps.extend(_node_ci_steps("backend"))
         else:
             install_command = _backend_install_command(files)
+            python_runner = _backend_python_runner(files)
             python_version = _backend_python_version(files)
+            dependency_file = (
+                "backend/uv.lock"
+                if "backend/pyproject.toml" in files
+                else "backend/requirements.txt"
+            )
             steps.extend(
                 [
-                    "      - uses: actions/setup-python@v5",
-                    f'        with: {{python-version: "{python_version}"}}',
+                    (
+                        "      - uses: astral-sh/setup-uv@"
+                        "bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0"
+                    ),
+                    "        with:",
+                    '          version: "0.12.18"',
+                    f'          python-version: "{python_version}"',
+                    "          enable-cache: true",
+                    f"          cache-dependency-glob: {dependency_file}",
                     f"      - run: {install_command}",
                     "        working-directory: backend",
-                    "      - run: python -m pytest",
+                    f"      - run: {python_runner} -m pytest",
                     "        working-directory: backend",
                 ]
             )

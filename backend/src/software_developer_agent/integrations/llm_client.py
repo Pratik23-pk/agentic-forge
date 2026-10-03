@@ -97,7 +97,7 @@ class OpenAIResponsesClient:
                 "schema": self._response_schema,
                 "strict": True,
             }
-        if self._model.startswith("gpt-5.6"):
+        if self._model.startswith(("gpt-5.6", "gpt-6")):
             text_config["verbosity"] = "low"
         if text_config:
             request["text"] = text_config

@@ -11,9 +11,9 @@ configured maximum per-run cost before starting another paid case.
 From the project root:
 
 ```bash
-backend/.venv/bin/python benchmark-results/campaign-control/run_campaign.py --preflight
-backend/.venv/bin/python benchmark-results/campaign-control/run_campaign.py --live --budget-cap-usd 12
-backend/.venv/bin/python benchmark-results/campaign-control/run_campaign.py --status
+uv run --project backend --locked --no-sync python benchmark-results/campaign-control/run_campaign.py --preflight
+uv run --project backend --locked --no-sync python benchmark-results/campaign-control/run_campaign.py --live --budget-cap-usd 12
+uv run --project backend --locked --no-sync python benchmark-results/campaign-control/run_campaign.py --status
 ```
 
 Pass `--case CASE_ID` one or more times to run only selected cases during focused diagnosis.

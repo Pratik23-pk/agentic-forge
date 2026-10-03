@@ -47,11 +47,21 @@ def deterministic_validation_commands(
     ):
         return ["cd frontend && npm ci && npm test && npm run build"]
     if capability_id in {"react-fastapi", "fastapi-api"} and worker_kind == WorkerKind.BACKEND:
-        return ["cd backend && python -m pip install -e '.[test]' && python -m pytest"]
+        return [
+            (
+                "cd backend && uv sync --locked --group test --no-editable "
+                "&& uv run --locked --no-sync python -m pytest"
+            )
+        ]
     if capability_id in {"react-node", "node-api"} and worker_kind == WorkerKind.BACKEND:
         return ["cd backend && npm ci && npm test && npm run build"]
     if capability_id == "python-cli" and worker_kind == WorkerKind.BACKEND:
-        return ["cd backend && python -m pip install -e '.[test]' && python -m pytest"]
+        return [
+            (
+                "cd backend && uv sync --locked --group test --no-editable "
+                "&& uv run --locked --no-sync python -m pytest"
+            )
+        ]
     return None
 
 
@@ -473,6 +483,7 @@ def _fastapi_files(project_prompt: str, project_id: str) -> dict[str, str]:
         dependencies.extend(["sqlalchemy==2.0.36", "psycopg[binary]==3.2.3"])
     dependency_lines = "\n".join(f'  "{dependency}",' for dependency in dependencies)
     files = {
+        "backend/.python-version": "3.11\n",
         "backend/pyproject.toml": dedent(
             f"""
             [project]
@@ -484,7 +495,7 @@ def _fastapi_files(project_prompt: str, project_id: str) -> dict[str, str]:
             {dependency_lines}
             ]
 
-            [project.optional-dependencies]
+            [dependency-groups]
             test = [
               "httpx==0.28.1",
               "pytest==8.3.5"
@@ -828,6 +839,7 @@ def _requests_persistence(project_prompt: str) -> bool:
 def _python_cli_files(project_prompt: str, project_id: str) -> dict[str, str]:
     package_name = _slugify(project_id).replace("-", "_")
     return {
+        "backend/.python-version": "3.11\n",
         "backend/pyproject.toml": dedent(
             f"""
             [project]
@@ -837,7 +849,7 @@ def _python_cli_files(project_prompt: str, project_id: str) -> dict[str, str]:
             requires-python = ">=3.11"
             dependencies = []
 
-            [project.optional-dependencies]
+            [dependency-groups]
             test = ["pytest==8.3.5"]
 
             [project.scripts]

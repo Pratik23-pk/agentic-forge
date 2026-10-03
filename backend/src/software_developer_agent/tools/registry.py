@@ -5,6 +5,7 @@ from software_developer_agent.mcp.client import MCPClient, create_mcp_client
 from software_developer_agent.mcp.types import MCPToolResponse
 from software_developer_agent.models.job_state import JobTask
 from software_developer_agent.tools.browser import PlaywrightBrowserTool, extract_urls
+from software_developer_agent.tools.media_assets import MediaAssetPipeline
 from software_developer_agent.tools.policy import ToolPolicy
 from software_developer_agent.tools.serper_search import SerperSearchTool
 
@@ -27,7 +28,36 @@ IMAGE_RESEARCH_TRIGGERS = (
     "photos",
     "gallery",
     "visual reference",
-    "media",
+)
+
+VIDEO_RESEARCH_TRIGGERS = (
+    "video",
+    "videos",
+    "gameplay",
+    "trailer",
+    "footage",
+    "clip",
+    "clips",
+)
+
+MEDIA_USAGE_TRIGGERS = (
+    "add",
+    "give",
+    "include",
+    "place",
+    "provide",
+    "put",
+    "show",
+    "display",
+    "feature",
+    "hero",
+    "gallery",
+    "background",
+    "download",
+    "embed",
+    "search",
+    "find",
+    "use",
 )
 
 
@@ -44,24 +74,34 @@ class ToolRegistry:
         self._mcp_client = mcp_client or create_mcp_client(settings)
         self._legacy_search = SerperSearchTool(settings)
         self._legacy_browser = PlaywrightBrowserTool(settings, self._policy)
+        self._legacy_media = MediaAssetPipeline(settings, self._policy, self._legacy_search)
 
     def collect_context(self, task: JobTask) -> ToolContext:
         text = task.instructions
+        request_text = self._request_text(task)
         results: list[MCPToolResponse] = []
         discovered_urls: list[str] = []
 
-        if task.worker_kind.value == "frontend" and self._should_search_images(text):
-            image_result = self._call_mcp(
-                "serper_image_search",
-                task,
-                {"query": self._search_query(task)},
-            )
-            results.append(image_result)
-            discovered_urls.extend(
-                url for url in image_result.metadata.get("urls", []) if isinstance(url, str) and url
-            )
+        if task.worker_kind.value == "frontend":
+            for kind in self._requested_media_kinds(request_text):
+                media_result = self._call_mcp(
+                    "media_asset_acquisition",
+                    task,
+                    {
+                        "query": self._media_search_query(task, kind),
+                        "kind": kind,
+                        "task_id": task.task_id,
+                        "instructions": task.instructions,
+                    },
+                )
+                results.append(media_result)
+                discovered_urls.extend(
+                    url
+                    for url in media_result.metadata.get("urls", [])
+                    if isinstance(url, str) and url
+                )
 
-        if self._should_search(text):
+        if self._should_search(request_text):
             search_result = self._call_mcp(
                 "serper_search",
                 task,
@@ -105,6 +145,23 @@ class ToolRegistry:
             result = self._legacy_search.search(str(payload.get("query", "")))
         elif tool_name == "serper_image_search":
             result = self._legacy_search.search_images(str(payload.get("query", "")))
+        elif tool_name == "serper_video_search":
+            result = self._legacy_search.search_videos(str(payload.get("query", "")))
+        elif tool_name == "media_asset_acquisition":
+            kind = str(payload.get("kind", ""))
+            if kind not in {"image", "video"}:
+                return MCPToolResponse(
+                    tool_name=tool_name,
+                    status="failed",
+                    input_summary=str(payload)[:500],
+                    output_summary="Media kind must be image or video.",
+                )
+            result = self._legacy_media.acquire(
+                str(payload.get("query", "")),
+                kind,
+                str(payload.get("task_id", "")),
+                str(payload.get("instructions", "")),
+            )
         elif tool_name == "playwright_browser":
             result = self._legacy_browser.inspect(str(payload.get("url", "")))
         else:
@@ -133,6 +190,17 @@ class ToolRegistry:
         lowered = text.lower()
         return any(trigger in lowered for trigger in IMAGE_RESEARCH_TRIGGERS)
 
+    @classmethod
+    def _requested_media_kinds(cls, text: str) -> list[str]:
+        lowered = text.lower()
+        has_usage_request = any(trigger in lowered for trigger in MEDIA_USAGE_TRIGGERS)
+        kinds: list[str] = []
+        if cls._should_search_images(text) and has_usage_request:
+            kinds.append("image")
+        if any(trigger in lowered for trigger in VIDEO_RESEARCH_TRIGGERS) and has_usage_request:
+            kinds.append("video")
+        return kinds
+
     @staticmethod
     def _search_query(task: JobTask) -> str:
         request = next(
@@ -144,6 +212,34 @@ class ToolRegistry:
             task.title,
         )
         return f"{request[:420]} high quality editorial photography"
+
+    @staticmethod
+    def _request_text(task: JobTask) -> str:
+        return next(
+            (
+                line.removeprefix("Request:").strip()
+                for line in task.instructions.splitlines()
+                if line.startswith("Request:")
+            ),
+            task.title,
+        )
+
+    @staticmethod
+    def _media_search_query(task: JobTask, kind: str) -> str:
+        request = next(
+            (
+                line.removeprefix("Request:").strip()
+                for line in task.instructions.splitlines()
+                if line.startswith("Request:")
+            ),
+            task.title,
+        )
+        suffix = (
+            "high quality editorial photography"
+            if kind == "image"
+            else "official embeddable video"
+        )
+        return f"{request[:420]} {suffix}"
 
 
 def _dedupe_urls(urls: list[str]) -> list[str]:
