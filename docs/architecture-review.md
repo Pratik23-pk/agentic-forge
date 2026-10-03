@@ -235,6 +235,18 @@ rejection of no-op or destructive repair patches, consistent secret redaction.
 - **Fix:** add ruff, mypy and `npm audit` to CI; one scheduled integration job with Docker; point
   tests at temporary directories.
 
+### 25. Evidence from a real run: both problems above happened at once
+- With Docker Desktop stopped, the first Docker step (`frontend_lockfile_generation`) failed. The
+  backend treated it as a dependency bug in the generated app and spent all six repair calls trying
+  to "fix" it. Infrastructure failures must stop the build with "start Docker", not trigger repairs.
+- With an invalid API key (an old `OPENAI_API_KEY` exported in the shell overrode `.env`), every model
+  call returned 401, yet the job only recorded a warning and continued on a starter template
+  (item 2). A 401 should fail the job immediately with "the API key was rejected".
+- `docker build --network bridge` (`sandbox/preview_manager.py:448`) fails on current Docker with
+  BuildKit ("network mode bridge not supported by buildkit"), so Docker previews cannot start.
+  Remove the flag from `docker build` (the default build network already has internet), or create a
+  buildx builder with that network.
+
 ---
 
 ## 5. Product limitations users will notice (labelled in the studio today)
