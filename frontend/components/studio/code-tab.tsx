@@ -51,11 +51,10 @@ interface CodeTabProps {
   jobId: string | undefined;
   job: JobPart | undefined;
   streamFiles: string[];
-  openPath: string | undefined;
-  onOpenPath: (path: string) => void;
+  openRequest: { path: string; id: number } | undefined;
 }
 
-export function CodeTab({ jobId, job, streamFiles, openPath, onOpenPath }: CodeTabProps) {
+export function CodeTab({ jobId, job, streamFiles, openRequest }: CodeTabProps) {
   const queryClient = useQueryClient();
   const ready = Boolean(jobId && job?.artifactsReady);
 
@@ -65,7 +64,8 @@ export function CodeTab({ jobId, job, streamFiles, openPath, onOpenPath }: CodeT
     enabled: ready,
   });
   const paths = ready ? (listing.data?.files.map((file) => file.path) ?? []) : streamFiles;
-  const selected = openPath && paths.includes(openPath) ? openPath : defaultFile(paths);
+  const [chosen, setChosen] = useState<string>();
+  const selected = chosen && paths.includes(chosen) ? chosen : defaultFile(paths);
   const editable = Boolean(selected && isEditableFile(selected));
 
   const content = useQuery({
@@ -92,7 +92,8 @@ export function CodeTab({ jobId, job, streamFiles, openPath, onOpenPath }: CodeT
       if (!saved || !jobId) return;
       queryClient.setQueryData(queryKeys.file(jobId, saved.path), saved.text);
       void queryClient.invalidateQueries({ queryKey: queryKeys.files(jobId) });
-      setDraft(null);
+      // Keep anything typed while the save was in flight.
+      setDraft((current) => (current && current.path === saved.path && current.text === saved.text ? null : current));
       setConflict(null);
       toast.success("Saved", { description: "Restart the preview if it does not pick up the change." });
     },
@@ -113,7 +114,17 @@ export function CodeTab({ jobId, job, streamFiles, openPath, onOpenPath }: CodeT
   function requestOpen(path: string) {
     if (path === selected) return;
     if (dirty) setPendingPath(path);
-    else onOpenPath(path);
+    else setChosen(path);
+  }
+
+  // Requests from the chat go through the same guard as clicks in the tree.
+  const [handledRequest, setHandledRequest] = useState(openRequest?.id);
+  if (openRequest && openRequest.id !== handledRequest) {
+    setHandledRequest(openRequest.id);
+    if (openRequest.path !== selected) {
+      if (dirty) setPendingPath(openRequest.path);
+      else setChosen(openRequest.path);
+    }
   }
 
   return (
@@ -191,7 +202,7 @@ export function CodeTab({ jobId, job, streamFiles, openPath, onOpenPath }: CodeT
               variant="destructive"
               onClick={() => {
                 setDraft(null);
-                if (pendingPath) onOpenPath(pendingPath);
+                if (pendingPath) setChosen(pendingPath);
                 setPendingPath(null);
               }}
             >

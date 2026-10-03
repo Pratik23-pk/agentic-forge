@@ -38,6 +38,9 @@ interface ChatPanelProps {
   /** True when a build is live but this page is not receiving its stream. */
   disconnected: boolean;
   onSend: (text: string) => void;
+  /** What the error alert offers: re-attach to a live build, or resend a message that never started one. */
+  errorAction: "reconnect" | "retry" | "none";
+  onRetry: () => void;
   onReconnect: () => void;
   onDismissError: () => void;
   onApprove: (jobId: string, note: string) => Promise<void>;
@@ -55,6 +58,8 @@ export function ChatPanel({
   error,
   disconnected,
   onSend,
+  errorAction,
+  onRetry,
   onReconnect,
   onDismissError,
   onApprove,
@@ -92,9 +97,15 @@ export function ChatPanel({
               <AlertDescription>
                 <p className="break-words">{error.message}</p>
                 <div className="mt-2 flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={onReconnect}>
-                    Reconnect
-                  </Button>
+                  {errorAction === "reconnect" ? (
+                    <Button size="sm" variant="secondary" onClick={onReconnect}>
+                      Reconnect
+                    </Button>
+                  ) : errorAction === "retry" ? (
+                    <Button size="sm" variant="secondary" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  ) : null}
                   <Button size="sm" variant="ghost" onClick={onDismissError}>
                     Dismiss
                   </Button>

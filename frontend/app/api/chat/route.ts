@@ -30,13 +30,27 @@ export async function POST(request: Request) {
       let parent: BackendJob | undefined;
       if (body.basedOnJobId) parent = await getJob(body.basedOnJobId, request.signal);
 
-      const metadata: Record<string, unknown> = { display_prompt: text };
+      // Versions keep the first request and the list of changes, so each new
+      // version composes from those instead of wrapping the previous prompt.
+      const parentMeta = parent?.request.metadata ?? {};
+      const originalPrompt =
+        typeof parentMeta.original_prompt === "string" ? parentMeta.original_prompt : parent?.request.prompt;
+      const changes = [
+        ...(Array.isArray(parentMeta.changes) ? parentMeta.changes.filter((c): c is string => typeof c === "string") : []),
+        ...(parent ? [text] : []),
+      ];
+
+      const metadata: Record<string, unknown> = {
+        display_prompt: text,
+        original_prompt: originalPrompt ?? text,
+        changes,
+      };
       if (body.capabilityId) metadata.capability_id = body.capabilityId;
       if (parent) metadata.based_on_job_id = parent.job_id;
 
       const job = await createJob(
         {
-          prompt: parent ? buildFollowUpPrompt(parent.request.prompt, text) : text,
+          prompt: parent && originalPrompt ? buildFollowUpPrompt(originalPrompt, changes) : text,
           project_id: body.projectName?.trim() || parent?.request.project_id,
           metadata,
         },

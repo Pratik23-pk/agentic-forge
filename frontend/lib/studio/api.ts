@@ -54,7 +54,10 @@ export const listJobs = () => json<BackendJob[]>("/api/jobs");
 export const listFiles = (jobId: string) => json<BackendFileListing>(`${job(jobId)}/files`);
 
 export async function readFile(jobId: string, path: string): Promise<string> {
-  return (await request(`${job(jobId)}/files/content?path=${encodeURIComponent(path)}`)).text();
+  const response = await request(`${job(jobId)}/files/content?path=${encodeURIComponent(path)}`);
+  // Keep a leading BOM: the backend hashes the text with it, so dropping it
+  // would make every save of such a file look like a conflict.
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(await response.arrayBuffer());
 }
 
 export class ConflictError extends ApiError {

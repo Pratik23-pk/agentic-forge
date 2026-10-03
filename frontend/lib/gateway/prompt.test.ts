@@ -4,10 +4,11 @@ import { describeBackendError } from "@/lib/backend/client";
 import { buildFollowUpPrompt, lastUserText } from "./prompt";
 
 describe("buildFollowUpPrompt", () => {
-  it("combines the original request with the change", () => {
-    const prompt = buildFollowUpPrompt("Build a habit tracker.", "  Add streaks.  ");
+  it("combines the original request with every change, without nesting", () => {
+    const prompt = buildFollowUpPrompt("Build a habit tracker.", ["  Add streaks.  ", "Dark mode"]);
     expect(prompt).toContain("Original request:\nBuild a habit tracker.");
-    expect(prompt).toContain("Changes for this version:\nAdd streaks.");
+    expect(prompt).toContain("1. Add streaks.\n2. Dark mode");
+    expect(prompt.match(/Build a new version/g)).toHaveLength(1);
   });
 });
 

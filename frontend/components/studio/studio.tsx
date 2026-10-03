@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -48,7 +48,9 @@ export function Studio({ chatId, initialMessages = [], resume = false, initialPr
   const queryClient = useQueryClient();
   const [fallbackChatId] = useState(() => crypto.randomUUID());
   const [tab, setTab] = useState<WorkspaceTab>("preview");
-  const [openPath, setOpenPath] = useState<string>();
+  const [openRequest, setOpenRequest] = useState<{ path: string; id: number }>();
+  // Written only in event handlers: the body of the last send, for retries.
+  const lastBody = useRef<Record<string, unknown>>({});
 
   const chat = useChat<ForgeMessage>({
     id: chatId ?? fallbackChatId,
@@ -77,11 +79,32 @@ export function Studio({ chatId, initialMessages = [], resume = false, initialPr
     }
   }, [job, queryClient]);
 
+  // A job can rewrite its files under the same id (e.g. changes requested at
+  // the release gate), so cached files and preview state follow its status.
+  const jobStatus = job?.status;
+  useEffect(() => {
+    if (!jobId || !jobStatus) return;
+    for (const key of [["files", jobId], ["file", jobId], ["preview", jobId]]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  }, [jobId, jobStatus, queryClient]);
+
+  function send(text: string, body: Record<string, unknown>) {
+    lastBody.current = body;
+    void chat.sendMessage({ text }, { body });
+  }
+
+  function retry() {
+    const last = chat.messages.at(-1);
+    if (last?.role !== "user") return;
+    const text = last.parts.map((part) => (part.type === "text" ? part.text : "")).join("");
+    chat.clearError();
+    chat.setMessages((messages) => messages.slice(0, -1));
+    send(text, lastBody.current);
+  }
+
   function start({ prompt, projectName, capabilityId }: NewProjectRequest) {
-    void chat.sendMessage(
-      { text: prompt },
-      { body: { projectName: projectName || undefined, capabilityId: capabilityId || undefined } },
-    );
+    send(prompt, { projectName: projectName || undefined, capabilityId: capabilityId || undefined });
   }
 
   async function respond(targetJobId: string, decision: "approve" | "request_changes", note: string) {
@@ -95,7 +118,7 @@ export function Studio({ chatId, initialMessages = [], resume = false, initialPr
   }
 
   function openFile(path: string) {
-    setOpenPath(path);
+    setOpenRequest((current) => ({ path, id: (current?.id ?? 0) + 1 }));
     setTab("code");
   }
 
@@ -126,9 +149,11 @@ export function Studio({ chatId, initialMessages = [], resume = false, initialPr
             messages={chat.messages}
             composerState={composerState}
             error={chat.error}
+            errorAction={live ? "reconnect" : chat.messages.at(-1)?.role === "user" ? "retry" : "none"}
+            onRetry={retry}
             disconnected={live && !streaming && !chat.error}
             onSend={(text) => {
-              void chat.sendMessage({ text }, { body: { basedOnJobId: jobId } });
+              send(text, { basedOnJobId: jobId });
             }}
             onReconnect={() => {
               chat.clearError();
@@ -151,8 +176,7 @@ export function Studio({ chatId, initialMessages = [], resume = false, initialPr
             validation={latest ? dataParts(latest, "validation") : []}
             tab={tab}
             onTabChange={setTab}
-            openPath={openPath}
-            onOpenPath={setOpenPath}
+            openRequest={openRequest}
           />
         </ResizablePanel>
       </ResizablePanelGroup>

@@ -17,6 +17,9 @@ RUN npm run build
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
+# Route handlers also call the API at runtime, not only the build-time rewrite.
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=$BACKEND_URL
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000

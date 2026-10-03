@@ -4,15 +4,15 @@ import type { UIMessage } from "ai";
  * The backend has no incremental edit endpoint, so a follow-up request builds
  * a new version from the original request plus the change.
  */
-export function buildFollowUpPrompt(originalPrompt: string, change: string): string {
+export function buildFollowUpPrompt(originalPrompt: string, changes: readonly string[]): string {
   return [
     "Build a new version of an existing project.",
     "",
     "Original request:",
     originalPrompt.trim(),
     "",
-    "Changes for this version:",
-    change.trim(),
+    "Changes, oldest first (apply all of them):",
+    ...changes.map((change, index) => `${index + 1}. ${change.trim()}`),
     "",
     "Keep everything from the original request unless the changes say otherwise.",
   ].join("\n");

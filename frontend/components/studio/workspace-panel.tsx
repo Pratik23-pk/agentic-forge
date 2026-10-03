@@ -16,8 +16,8 @@ interface WorkspacePanelProps {
   validation: ValidationPart[];
   tab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
-  openPath: string | undefined;
-  onOpenPath: (path: string) => void;
+  /** A file the chat asked to open; the code tab applies its unsaved-changes guard. */
+  openRequest: { path: string; id: number } | undefined;
 }
 
 export function WorkspacePanel({
@@ -28,8 +28,7 @@ export function WorkspacePanel({
   validation,
   tab,
   onTabChange,
-  openPath,
-  onOpenPath,
+  openRequest,
 }: WorkspacePanelProps) {
   return (
     <Tabs
@@ -49,7 +48,7 @@ export function WorkspacePanel({
         <PreviewTab jobId={jobId} job={job} />
       </TabsContent>
       <TabsContent value="code" forceMount className="min-h-0 flex-1 data-[state=inactive]:hidden">
-        <CodeTab jobId={jobId} job={job} streamFiles={streamFiles} openPath={openPath} onOpenPath={onOpenPath} />
+        <CodeTab jobId={jobId} job={job} streamFiles={streamFiles} openRequest={openRequest} />
       </TabsContent>
       <TabsContent value="activity" forceMount className="min-h-0 flex-1 overflow-auto data-[state=inactive]:hidden">
         <ActivityTab job={job} stages={stages} validation={validation} />
