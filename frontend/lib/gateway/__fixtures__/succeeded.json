@@ -1,0 +1,703 @@
+{
+ "request": {
+  "prompt": "Build a small habit tracker web app where users add habits and tick them off each day.",
+  "project_id": "Habit Tracker",
+  "metadata": {
+   "project_name_generated": false
+  }
+ },
+ "job_id": "aeb5110f-7485-418e-84e1-a2b56d149d2d",
+ "status": "succeeded",
+ "request_policy": {
+  "requested_capabilities": [],
+  "excluded_capabilities": []
+ },
+ "project_spec": {
+  "capability_id": "react-fastapi",
+  "application_type": "fullstack_web_application",
+  "frontend_framework": "React with Vite",
+  "backend_framework": "FastAPI",
+  "primary_languages": [
+   "TypeScript",
+   "Python"
+  ],
+  "runtime_versions": {
+   "node": "20",
+   "python": "3.11"
+  },
+  "package_managers": {
+   "javascript": "npm",
+   "python": "pip"
+  },
+  "ports": {
+   "frontend": 5173,
+   "backend": 8000
+  },
+  "adapter_ids": [
+   "core",
+   "stack:react-fastapi"
+  ],
+  "requested_features": [],
+  "excluded_features": [],
+  "acceptance_criteria": [
+   "All declared dependency installation commands succeed.",
+   "All generated tests pass.",
+   "The production build succeeds when the stack has a build step.",
+   "The application starts locally and its primary workflow succeeds.",
+   "Generated documentation references only files and commands that exist."
+  ],
+  "explicitly_selected": false,
+  "confidence": 0.72,
+  "schema_version": 1
+ },
+ "design_spec": {
+  "product_summary": "Build a small habit tracker web app where users add habits and tick them off each day.",
+  "experience_goal": "A polished, focused, responsive product experience.",
+  "visual_direction": {
+   "tone": "premium, minimal, content-led",
+   "theme": "adaptive dark and light surfaces",
+   "typography": "clear display hierarchy with highly readable body text",
+   "color_strategy": "restrained neutral foundation with one contextual accent",
+   "motion": "purposeful micro-interactions with reduced-motion support"
+  },
+  "primary_surfaces": [
+   "primary workflow",
+   "loading state",
+   "empty state",
+   "error state"
+  ],
+  "interaction_requirements": [
+   "Keyboard-accessible controls",
+   "Responsive behavior from mobile through desktop",
+   "Visible feedback for every user action"
+  ],
+  "quality_criteria": [
+   "No placeholder or template-like presentation",
+   "Strong first-screen hierarchy",
+   "Consistent spacing, type, color, and interaction tokens",
+   "Real requested content and media with accessible alternatives"
+  ]
+ },
+ "approval_state": {
+  "job_id": "aeb5110f-7485-418e-84e1-a2b56d149d2d",
+  "revision": 5,
+  "gates": {
+   "product_contract": {
+    "revision": 2,
+    "status": "approved",
+    "payload": {
+     "checkpoint_id": "872c19b9-ee90-4724-8b21-399df92be896",
+     "response": null
+    }
+   },
+   "privileged_action": {
+    "revision": 3,
+    "status": "auto_approved",
+    "payload": {
+     "reason": "No privileged external action is required."
+    }
+   },
+   "release": {
+    "revision": 5,
+    "status": "approved",
+    "payload": {
+     "checkpoint_id": "020a37ae-505e-45d0-ba19-4254f4069364",
+     "response": null
+    }
+   }
+  }
+ },
+ "cost_ledger": {
+  "currency": "USD",
+  "normal_limit_usd": 0.25,
+  "hard_limit_usd": 1.0,
+  "budget_phase": "normal",
+  "spent_usd": 0.0,
+  "prompt_tokens": 0,
+  "cached_prompt_tokens": 0,
+  "completion_tokens": 0,
+  "reasoning_tokens": 0,
+  "authorizations": {}
+ },
+ "api_contract": {},
+ "tasks": [
+  {
+   "worker_kind": "backend",
+   "title": "Backend implementation",
+   "instructions": "Worker: backend\nProject: Habit Tracker\nRequest: Build a small habit tracker web app where users add habits and tick them off each day.\nRequest policy: {\"excluded_capabilities\": [], \"requested_capabilities\": []}\nCapability: react-fastapi\nProject specification: {\"acceptance_criteria\": [\"All declared d",
+   "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+   "status": "succeeded",
+   "attempt": 1,
+   "max_attempts": 4,
+   "depends_on": [],
+   "capability_id": "react-fastapi",
+   "adapter_ids": [
+    "core",
+    "stack:react-fastapi"
+   ],
+   "retry_context": null,
+   "transport_attempts": 1,
+   "repair_rejections": 0
+  },
+  {
+   "worker_kind": "frontend",
+   "title": "Frontend implementation",
+   "instructions": "Worker: frontend\nProject: Habit Tracker\nRequest: Build a small habit tracker web app where users add habits and tick them off each day.\nRequest policy: {\"excluded_capabilities\": [], \"requested_capabilities\": []}\nCapability: react-fastapi\nProject specification: {\"acceptance_criteria\": [\"All declared ",
+   "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+   "status": "succeeded",
+   "attempt": 1,
+   "max_attempts": 4,
+   "depends_on": [],
+   "capability_id": "react-fastapi",
+   "adapter_ids": [
+    "core",
+    "stack:react-fastapi"
+   ],
+   "retry_context": null,
+   "transport_attempts": 1,
+   "repair_rejections": 0
+  }
+ ],
+ "worker_results": [
+  {
+   "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+   "worker_kind": "backend",
+   "status": "succeeded",
+   "summary": "backend worker generated local runnable source files.",
+   "output": "{\"summary\":\"backend worker generated local runnable source files.\",\"operation\":\"replace\",\"files\":[{\"path\":\"backend/pyproject.toml\",\"content\":\"[project]\\n          name = \\\"habit-tracker-api\\\"\\n       ",
+   "errors": [],
+   "artifacts": [
+    "backend/pyproject.toml",
+    "backend/src/app/__init__.py",
+    "backend/src/app/main.py",
+    "backend/tests/test_app.py"
+   ],
+   "tool_calls": [
+    {
+     "tool": "serper_search",
+     "status": "skipped",
+     "input_summary": "Build a small habit tracker web app where users add habits and tick them off each day. high quality editorial photography",
+     "output_summary": "Web search is disabled.",
+     "metadata": {
+      "elapsed_ms": 0.01
+     },
+     "error": null,
+     "protocol": "mcp"
+    }
+   ],
+   "attempt": 1,
+   "used_fallback": false
+  },
+  {
+   "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+   "worker_kind": "frontend",
+   "status": "succeeded",
+   "summary": "frontend worker generated local runnable source files.",
+   "output": "{\"summary\":\"frontend worker generated local runnable source files.\",\"operation\":\"replace\",\"files\":[{\"path\":\"frontend/index.html\",\"content\":\"<!doctype html>\\n<html lang=\\\"en\\\">\\n  <head>\\n    <meta cha",
+   "errors": [],
+   "artifacts": [
+    "frontend/index.html",
+    "frontend/package.json",
+    "frontend/src/App.tsx",
+    "frontend/src/main.tsx",
+    "frontend/src/project.test.ts",
+    "frontend/src/project.ts",
+    "frontend/src/styles.css",
+    "frontend/src/vite-env.d.ts",
+    "frontend/tsconfig.json",
+    "frontend/vite.config.ts"
+   ],
+   "tool_calls": [
+    {
+     "tool": "serper_image_search",
+     "status": "skipped",
+     "input_summary": "Build a small habit tracker web app where users add habits and tick them off each day. high quality editorial photography",
+     "output_summary": "Web search is disabled.",
+     "metadata": {
+      "elapsed_ms": 0.0
+     },
+     "error": null,
+     "protocol": "mcp"
+    }
+   ],
+   "attempt": 1,
+   "used_fallback": false
+  }
+ ],
+ "manifest_state": {
+  "job_id": "aeb5110f-7485-418e-84e1-a2b56d149d2d",
+  "project_id": "Habit Tracker",
+  "revision": 2,
+  "files": {
+   "backend/pyproject.toml": {
+    "path": "backend/pyproject.toml",
+    "content": "[project]\n          name = \"habit-tracker-api\"\n          version = \"0.1.0\"\n     ",
+    "worker_kind": "backend",
+    "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+    "attempt": 1,
+    "revision": 1,
+    "checksum": "03faf4b96a820d84787b593d098720d6078815819e0c7eafd807bcee19e14134",
+    "deleted": false
+   },
+   "backend/src/app/__init__.py": {
+    "path": "backend/src/app/__init__.py",
+    "content": "",
+    "worker_kind": "backend",
+    "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+    "attempt": 1,
+    "revision": 1,
+    "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "deleted": false
+   },
+   "backend/src/app/main.py": {
+    "path": "backend/src/app/main.py",
+    "content": "from __future__ import annotations\n\nfrom fastapi import FastAPI, HTTPException\nf",
+    "worker_kind": "backend",
+    "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+    "attempt": 1,
+    "revision": 1,
+    "checksum": "6429f250fc79b3d209e9c8c2c319af09565f09d60e8ca9e3c1e4c70ed2a469af",
+    "deleted": false
+   },
+   "backend/tests/test_app.py": {
+    "path": "backend/tests/test_app.py",
+    "content": "from fastapi.testclient import TestClient\n\nfrom app.main import app\n\n\nclient = T",
+    "worker_kind": "backend",
+    "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+    "attempt": 1,
+    "revision": 1,
+    "checksum": "0b01da2c779be00c1bfa0cac97a1774fe0c0b2b2e634fe5d56da84b8842d3474",
+    "deleted": false
+   },
+   "frontend/index.html": {
+    "path": "frontend/index.html",
+    "content": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "ea93898e230725d1cdfdabba1672204d8786575ab4e5dc5a3bae150ee1e06ee1",
+    "deleted": false
+   },
+   "frontend/package.json": {
+    "path": "frontend/package.json",
+    "content": "{\n  \"name\": \"habit-tracker-frontend\",\n  \"version\": \"0.1.0\",\n  \"private\": true,\n ",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "f2c01187a261d2295012a50f90d6bc6f693b650d4734a43ba984d6aa180d8bb1",
+    "deleted": false
+   },
+   "frontend/src/App.tsx": {
+    "path": "frontend/src/App.tsx",
+    "content": "import { backendEnabled, projectSummary } from \"./project\";\n\nexport function App",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "d50e20c617592f447942957b718a313f8342abce202bda0880e034dd35638fb4",
+    "deleted": false
+   },
+   "frontend/src/main.tsx": {
+    "path": "frontend/src/main.tsx",
+    "content": "import { StrictMode } from \"react\";\nimport { createRoot } from \"react-dom/client",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "9794192bc70bf253693ee26b98a75811c8628f36ad58f5c89422abc17f3285b3",
+    "deleted": false
+   },
+   "frontend/src/project.test.ts": {
+    "path": "frontend/src/project.test.ts",
+    "content": "import { describe, expect, it } from \"vitest\";\nimport { backendEnabled, projectS",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "0cbc4a832e4b661284ac6ed1fc93056d10a546687966b811f70138cd010956dd",
+    "deleted": false
+   },
+   "frontend/src/project.ts": {
+    "path": "frontend/src/project.ts",
+    "content": "export const projectSummary = \"Build a small habit tracker web app where users a",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "da975086d0cd2ba2cde310eaa04b7932a68ed07edca02d11db907a7b8af8779c",
+    "deleted": false
+   },
+   "frontend/src/styles.css": {
+    "path": "frontend/src/styles.css",
+    "content": ":root {\n  --background: #07101e;\n  --surface: #0d1b2c;\n  --text: #edf6ff;\n  --mu",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "02289519b03a9d2fa152f4a7ac90bfc4390540f05ae66f2f569dcdd7259581da",
+    "deleted": false
+   },
+   "frontend/src/vite-env.d.ts": {
+    "path": "frontend/src/vite-env.d.ts",
+    "content": "/// <reference types=\"vite/client\" />\n",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
+    "deleted": false
+   },
+   "frontend/tsconfig.json": {
+    "path": "frontend/tsconfig.json",
+    "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"useDefineForClassFields\": ",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "b53df02d00d563c2841f7e9719a7d42ba1c1294575ee78fc5b00af2f3ae84512",
+    "deleted": false
+   },
+   "frontend/vite.config.ts": {
+    "path": "frontend/vite.config.ts",
+    "content": "import react from \"@vitejs/plugin-react\";\nimport { defineConfig } from \"vite\";\n\n",
+    "worker_kind": "frontend",
+    "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+    "attempt": 1,
+    "revision": 2,
+    "checksum": "0ca419d3a417f54c61df5ea99d234dcd2014d55e0418a5eb3a1cbe7cfdfe3baf",
+    "deleted": false
+   }
+  }
+ },
+ "verified_manifest_state": {},
+ "verified_validation": {
+  "passed": true,
+  "release_ready": true,
+  "checks": [
+   "structural_validation:skipped_in_test"
+  ],
+  "results": [],
+  "retry_targets": [],
+  "failure_reason": null,
+  "failure_kind": null,
+  "advisories": [],
+  "adapter_findings": []
+ },
+ "manifest_generation": 0,
+ "manifest_transaction": {},
+ "guardrail_reports": [
+  {
+   "name": "acceptable_use",
+   "passed": true,
+   "findings": [
+    {
+     "name": "acceptable_use",
+     "passed": true,
+     "severity": "info",
+     "message": "No prohibited-use patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "input_token_limit",
+   "passed": true,
+   "findings": [
+    {
+     "name": "input_token_limit",
+     "passed": true,
+     "severity": "info",
+     "message": "Estimated input tokens 21 are within limit 25000.",
+     "metadata": {
+      "estimated_tokens": 21,
+      "max_tokens": 25000
+     }
+    }
+   ]
+  },
+  {
+   "name": "prompt_injection",
+   "passed": true,
+   "findings": [
+    {
+     "name": "prompt_injection",
+     "passed": true,
+     "severity": "info",
+     "message": "No prompt-injection patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "dlp_scan",
+   "passed": true,
+   "findings": [
+    {
+     "name": "dlp_scan",
+     "passed": true,
+     "severity": "info",
+     "message": "No PII-like patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "api_key_detection",
+   "passed": true,
+   "findings": [
+    {
+     "name": "api_key_detection",
+     "passed": true,
+     "severity": "info",
+     "message": "No API key patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "vulnerability_scan",
+   "passed": true,
+   "findings": [
+    {
+     "name": "vulnerability_scan",
+     "passed": true,
+     "severity": "info",
+     "message": "No known high-risk code patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "dlp_scan",
+   "passed": true,
+   "findings": [
+    {
+     "name": "dlp_scan",
+     "passed": true,
+     "severity": "info",
+     "message": "No PII-like patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "api_key_detection",
+   "passed": true,
+   "findings": [
+    {
+     "name": "api_key_detection",
+     "passed": true,
+     "severity": "info",
+     "message": "No API key patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "vulnerability_scan",
+   "passed": true,
+   "findings": [
+    {
+     "name": "vulnerability_scan",
+     "passed": true,
+     "severity": "info",
+     "message": "No known high-risk code patterns detected.",
+     "metadata": {}
+    }
+   ]
+  }
+ ],
+ "artifacts": [
+  {
+   "artifact_id": "project-folder",
+   "kind": "folder",
+   "name": "habit-tracker-aeb5110f",
+   "path": "/Users/sumitdey/Desktop/products/agentic-forge/generated-projects/habit-tracker-aeb5110f",
+   "url": "/api/jobs/aeb5110f-7485-418e-84e1-a2b56d149d2d/files",
+   "metadata": {
+    "file_count": 20,
+    "source": "worker_manifests",
+    "files": [
+     ".gitignore",
+     "README.md",
+     "artifacts/api-contract.json",
+     "artifacts/blueprint.json",
+     "artifacts/risk-report.json"
+    ],
+    "validation": {
+     "passed": true,
+     "release_ready": true,
+     "checks": [
+      "structural_validation:skipped_in_test"
+     ],
+     "results": [],
+     "retry_targets": [],
+     "failure_reason": null,
+     "failure_kind": null,
+     "advisories": [],
+     "adapter_findings": []
+    },
+    "validation_commands": [],
+    "release_status": "verified",
+    "publish_allowed": true,
+    "risk_findings": []
+   }
+  },
+  {
+   "artifact_id": "project-zip",
+   "kind": "zip",
+   "name": "habit-tracker-aeb5110f.zip",
+   "path": "/Users/sumitdey/Desktop/products/agentic-forge/artifacts/habit-tracker-aeb5110f.zip",
+   "url": "/api/jobs/aeb5110f-7485-418e-84e1-a2b56d149d2d/download",
+   "metadata": {
+    "file_count": 20,
+    "source": "worker_manifests",
+    "files": [
+     ".gitignore",
+     "README.md",
+     "artifacts/api-contract.json",
+     "artifacts/blueprint.json",
+     "artifacts/risk-report.json"
+    ],
+    "validation": {
+     "passed": true,
+     "release_ready": true,
+     "checks": [
+      "structural_validation:skipped_in_test"
+     ],
+     "results": [],
+     "retry_targets": [],
+     "failure_reason": null,
+     "failure_kind": null,
+     "advisories": [],
+     "adapter_findings": []
+    },
+    "validation_commands": [],
+    "release_status": "verified",
+    "publish_allowed": true,
+    "risk_findings": []
+   }
+  }
+ ],
+ "release_status": "verified",
+ "risk_findings": [],
+ "quarantine_preview_consumed": false,
+ "artifact_errors": [],
+ "validation_results": [],
+ "repair_tickets": [],
+ "active_repair_ticket_ids": {},
+ "failure_fingerprints": {},
+ "feedback_requests": [
+  {
+   "gate": "product_contract",
+   "worker_kind": null,
+   "task_id": null,
+   "attempt": 0,
+   "title": "Approve the product contract",
+   "prompt": "Confirm the product scope, stack, experience direction, workers, and API contract before implementation begins.",
+   "summary": "Planning and visual direction are complete.",
+   "visual_type": "structured_json",
+   "visual_content": "{\n  \"project_id\": \"Habit Tracker\",\n  \"request\": \"Build a small habit tracker web app where users add habits and tick them off each day.\",\n  \"stack\": {\n    \"capability_id\": \"react-fastapi\",\n    \"application_type\": \"fullstack_web_application\",\n    \"frontend_framework\": \"React with Vite\",\n    \"backend_framework\": \"FastAPI\",\n    \"primary_languages\": [\n      \"TypeScript\",\n      \"Python\"\n    ],\n    \"runtime_versions\": {\n      \"node\": \"20\",\n      \"python\": \"3.11\"\n    },\n    \"package_managers\": {\n      \"javascript\": \"npm\",\n      \"python\": \"pip\"\n    },\n    \"ports\": {\n      \"frontend\": 5173,\n      \"backend\": 8000\n    },\n    \"adapter_ids\": [\n      \"core\",\n      \"stack:react-fastapi\"\n    ],\n    \"requested_features\": [],\n    \"excluded_features\": [],\n    \"acceptance_criteria\": [\n      \"All declared dependency installation commands succeed.\",\n      \"All generated tests pass.\",\n      \"The production build succeeds when the stack has a build step.\",\n      \"The application starts locally and its primary workflow succeeds.\",\n      \"Generated documentation references only files and commands that exist.\"\n    ],\n    \"explicitly_selected\": false,\n    \"confidence\": 0.72,\n    \"schema_version\": 1\n  },\n  \"design\": {\n    \"product_summary\": \"Build a small habit tracker web app where users add habits and tick them off each day.\",\n    \"experience_goal\": \"A polished, focused, responsive product experience.\",\n    \"visual_direction\": {\n      \"tone\": \"premium, minimal, content-led\",\n      \"theme\": \"adaptive da",
+   "checkpoint_id": "872c19b9-ee90-4724-8b21-399df92be896",
+   "status": "approved",
+   "response": null,
+   "metadata": {
+    "required": true,
+    "stage": "product_contract"
+   },
+   "created_at": "2026-09-26T04:13:45.752506+00:00",
+   "updated_at": "2026-09-26T04:13:46.029649+00:00"
+  },
+  {
+   "gate": "release",
+   "worker_kind": null,
+   "task_id": null,
+   "attempt": 0,
+   "title": "Approve the validated release",
+   "prompt": "Review the runnable preview, validation evidence, risks, files, and cost. Approve to unlock release actions, or request a focused revision.",
+   "summary": "The latest runnable checkpoint is ready for final review.",
+   "visual_type": "structured_json",
+   "visual_content": "{\n  \"release_status\": \"verified\",\n  \"publish_allowed_after_approval\": true,\n  \"validation\": {\n    \"passed\": true,\n    \"release_ready\": true,\n    \"checks\": [\n      \"structural_validation:skipped_in_test\"\n    ],\n    \"results\": [],\n    \"retry_targets\": [],\n    \"failure_reason\": null,\n    \"failure_kind\": null,\n    \"advisories\": [],\n    \"adapter_findings\": []\n  },\n  \"risk_findings\": [],\n  \"artifacts\": [\n    {\n      \"kind\": \"folder\",\n      \"name\": \"habit-tracker-aeb5110f\",\n      \"url\": \"/api/jobs/aeb5110f-7485-418e-84e1-a2b56d149d2d/files\"\n    },\n    {\n      \"kind\": \"zip\",\n      \"name\": \"habit-tracker-aeb5110f.zip\",\n      \"url\": \"/api/jobs/aeb5110f-7485-418e-84e1-a2b56d149d2d/download\"\n    }\n  ],\n  \"cost\": {\n    \"currency\": \"USD\",\n    \"normal_limit_usd\": 0.25,\n    \"hard_limit_usd\": 1.0,\n    \"budget_phase\": \"normal\",\n    \"spent_usd\": 0.0,\n    \"prompt_tokens\": 0,\n    \"cached_prompt_tokens\": 0,\n    \"completion_tokens\": 0,\n    \"reasoning_tokens\": 0,\n    \"calls\": [],\n    \"authorizations\": {}\n  }\n}",
+   "checkpoint_id": "020a37ae-505e-45d0-ba19-4254f4069364",
+   "status": "approved",
+   "response": null,
+   "metadata": {
+    "release": {
+     "release_status": "verified",
+     "publish_allowed_after_approval": true,
+     "validation": {
+      "passed": true,
+      "release_ready": true,
+      "checks": [
+       "structural_validation:skipped_in_test"
+      ],
+      "results": [],
+      "retry_targets": [],
+      "failure_reason": null,
+      "failure_kind": null,
+      "advisories": [],
+      "adapter_findings": []
+     },
+     "risk_findings": [],
+     "artifacts": [
+      {
+       "kind": "folder",
+       "name": "habit-tracker-aeb5110f",
+       "url": "/api/jobs/aeb5110f-7485-418e-84e1-a2b56d149d2d/files"
+      },
+      {
+       "kind": "zip",
+       "name": "habit-tracker-aeb5110f.zip",
+       "url": "/api/jobs/aeb5110f-7485-418e-84e1-a2b56d149d2d/download"
+      }
+     ],
+     "cost": {
+      "currency": "USD",
+      "normal_limit_usd": 0.25,
+      "hard_limit_usd": 1.0,
+      "budget_phase": "normal",
+      "spent_usd": 0.0,
+      "prompt_tokens": 0,
+      "cached_prompt_tokens": 0,
+      "completion_tokens": 0,
+      "reasoning_tokens": 0,
+      "calls": [],
+      "authorizations": {}
+     }
+    },
+    "required": true,
+    "stage": "release"
+   },
+   "created_at": "2026-09-26T04:13:46.070302+00:00",
+   "updated_at": "2026-09-26T04:13:46.342404+00:00"
+  }
+ ],
+ "active_feedback_request_id": null,
+ "evaluation": {
+  "passed": true,
+  "retry_targets": [],
+  "replan_required": false,
+  "failure_reason": null,
+  "checks": [
+   "file_manifest:backend:4",
+   "file_manifest:frontend:10",
+   "artifact_folder:true",
+   "artifact_zip:true",
+   "artifact_validation:passed",
+   "planner_task_presence",
+   "worker_succeeded:backend",
+   "worker_succeeded:frontend"
+  ],
+  "context_pruned": true,
+  "decision": "approved",
+  "warnings": [],
+  "evidence": []
+ },
+ "loop_count": 1,
+ "errors": [],
+ "warnings": [],
+ "created_at": "2026-09-26T04:13:45.706173+00:00",
+ "updated_at": "2026-09-26T04:13:46.381224+00:00"
+}

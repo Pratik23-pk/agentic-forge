@@ -12,7 +12,7 @@ and downloadable software project while preserving human control over sensitive 
 
 | Layer | Technology |
 | --- | --- |
-| Studio | React 18, TypeScript, Vite |
+| Studio | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, AI Elements |
 | Control plane | FastAPI, Pydantic, background job execution |
 | Python packaging | uv with committed lockfiles and exact environment sync |
 | Orchestration | LangGraph parent workflow and repair subgraph |
@@ -95,7 +95,7 @@ filesystem writes, or artifact mutation capability.
 
 ```mermaid
 flowchart LR
-    User["User"] --> Studio["React + Vite Studio"]
+    User["User"] --> Studio["Next.js Studio"]
     Studio --> Uploads["Validated User Media"]
     Studio --> Speech["Voice Transcription"]
     Studio --> API["FastAPI Control Plane"]
@@ -347,8 +347,12 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. The frontend proxies `/api` to `http://localhost:8000`.
-Both servers must be running. If the backend is stopped, workflow requests cannot be submitted.
+Open `http://localhost:5173`. Requests to `/api/*` that no Next.js route handles fall back to
+the Python API at `BACKEND_URL` (default `http://localhost:8000`).
+
+> The studio is being rebuilt (see `docs/frontend/roadmap.md`). On the
+> `feat/frontend-phase-1-design-system` branch the app serves the design-system reference at
+> `/dev/states`; the working studio remains on `main` until Phase 3.
 
 ## Generated Output
 
@@ -384,7 +388,7 @@ critical severity and retain high findings as visible advisories.
 
 ```bash
 cd backend && uv run --locked --no-sync pytest
-cd frontend && npm run build
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 ```
 
 Run the repeatable twelve-case benchmark, including heritage, commerce/RBAC, browser-game,

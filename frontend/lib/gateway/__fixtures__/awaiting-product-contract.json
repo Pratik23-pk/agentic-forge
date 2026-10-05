@@ -1,0 +1,331 @@
+{
+ "request": {
+  "prompt": "Build a small habit tracker web app where users add habits and tick them off each day.",
+  "project_id": "Habit Tracker",
+  "metadata": {
+   "project_name_generated": false
+  }
+ },
+ "job_id": "aeb5110f-7485-418e-84e1-a2b56d149d2d",
+ "status": "awaiting_human_feedback",
+ "request_policy": {
+  "requested_capabilities": [],
+  "excluded_capabilities": []
+ },
+ "project_spec": {
+  "capability_id": "react-fastapi",
+  "application_type": "fullstack_web_application",
+  "frontend_framework": "React with Vite",
+  "backend_framework": "FastAPI",
+  "primary_languages": [
+   "TypeScript",
+   "Python"
+  ],
+  "runtime_versions": {
+   "node": "20",
+   "python": "3.11"
+  },
+  "package_managers": {
+   "javascript": "npm",
+   "python": "pip"
+  },
+  "ports": {
+   "frontend": 5173,
+   "backend": 8000
+  },
+  "adapter_ids": [
+   "core",
+   "stack:react-fastapi"
+  ],
+  "requested_features": [],
+  "excluded_features": [],
+  "acceptance_criteria": [
+   "All declared dependency installation commands succeed.",
+   "All generated tests pass.",
+   "The production build succeeds when the stack has a build step.",
+   "The application starts locally and its primary workflow succeeds.",
+   "Generated documentation references only files and commands that exist."
+  ],
+  "explicitly_selected": false,
+  "confidence": 0.72,
+  "schema_version": 1
+ },
+ "design_spec": {
+  "product_summary": "Build a small habit tracker web app where users add habits and tick them off each day.",
+  "experience_goal": "A polished, focused, responsive product experience.",
+  "visual_direction": {
+   "tone": "premium, minimal, content-led",
+   "theme": "adaptive dark and light surfaces",
+   "typography": "clear display hierarchy with highly readable body text",
+   "color_strategy": "restrained neutral foundation with one contextual accent",
+   "motion": "purposeful micro-interactions with reduced-motion support"
+  },
+  "primary_surfaces": [
+   "primary workflow",
+   "loading state",
+   "empty state",
+   "error state"
+  ],
+  "interaction_requirements": [
+   "Keyboard-accessible controls",
+   "Responsive behavior from mobile through desktop",
+   "Visible feedback for every user action"
+  ],
+  "quality_criteria": [
+   "No placeholder or template-like presentation",
+   "Strong first-screen hierarchy",
+   "Consistent spacing, type, color, and interaction tokens",
+   "Real requested content and media with accessible alternatives"
+  ]
+ },
+ "approval_state": {
+  "job_id": "aeb5110f-7485-418e-84e1-a2b56d149d2d",
+  "revision": 1,
+  "gates": {
+   "product_contract": {
+    "revision": 1,
+    "status": "pending",
+    "payload": {
+     "checkpoint_id": "872c19b9-ee90-4724-8b21-399df92be896",
+     "contract": {
+      "project_id": "Habit Tracker",
+      "request": "Build a small habit tracker web app where users add habits and tick them off each day.",
+      "stack": {
+       "capability_id": "react-fastapi",
+       "application_type": "fullstack_web_application",
+       "frontend_framework": "React with Vite",
+       "backend_framework": "FastAPI",
+       "primary_languages": [
+        "TypeScript",
+        "Python"
+       ],
+       "runtime_versions": {
+        "node": "20",
+        "python": "3.11"
+       },
+       "package_managers": {
+        "javascript": "npm",
+        "python": "pip"
+       },
+       "ports": {
+        "frontend": 5173,
+        "backend": 8000
+       },
+       "adapter_ids": [
+        "core",
+        "stack:react-fastapi"
+       ],
+       "requested_features": [],
+       "excluded_features": [],
+       "acceptance_criteria": [
+        "All declared dependency installation commands succeed.",
+        "All generated tests pass.",
+        "The production build succeeds when the stack has a build step.",
+        "The application starts locally and its primary workflow succeeds.",
+        "Generated documentation references only files and commands that exist."
+       ],
+       "explicitly_selected": false,
+       "confidence": 0.72,
+       "schema_version": 1
+      },
+      "design": {
+       "product_summary": "Build a small habit tracker web app where users add habits and tick them off each day.",
+       "experience_goal": "A polished, focused, responsive product experience.",
+       "visual_direction": {
+        "tone": "premium, minimal, content-led",
+        "theme": "adaptive dark and light surfaces",
+        "typography": "clear display hierarchy with highly readable body text",
+        "color_strategy": "restrained neutral foundation with one contextual accent",
+        "motion": "purposeful micro-interactions with reduced-motion support"
+       },
+       "primary_surfaces": [
+        "primary workflow",
+        "loading state",
+        "empty state",
+        "error state"
+       ],
+       "interaction_requirements": [
+        "Keyboard-accessible controls",
+        "Responsive behavior from mobile through desktop",
+        "Visible feedback for every user action"
+       ],
+       "quality_criteria": [
+        "No placeholder or template-like presentation",
+        "Strong first-screen hierarchy",
+        "Consistent spacing, type, color, and interaction tokens",
+        "Real requested content and media with accessible alternatives"
+       ]
+      },
+      "workers": [
+       {
+        "worker_kind": "backend",
+        "title": "Backend implementation",
+        "depends_on": []
+       },
+       {
+        "worker_kind": "frontend",
+        "title": "Frontend implementation",
+        "depends_on": []
+       }
+      ],
+      "api_contract": {
+       "backend_port": 8000,
+       "frontend_port": 5173,
+       "routes": [],
+       "runtime_connectivity": {
+        "api_base_strategy": "same_origin_proxy",
+        "frontend_api_env": "VITE_API_BASE_URL",
+        "backend_cors_env": "CORS_ORIGINS",
+        "credentials_mode": "same-origin",
+        "protocols": [
+         "http"
+        ]
+       }
+      },
+      "privileged_actions": []
+     },
+     "required": true
+    }
+   }
+  }
+ },
+ "cost_ledger": {
+  "currency": "USD",
+  "normal_limit_usd": 0.25,
+  "hard_limit_usd": 1.0,
+  "budget_phase": "normal",
+  "spent_usd": 0.0,
+  "prompt_tokens": 0,
+  "cached_prompt_tokens": 0,
+  "completion_tokens": 0,
+  "reasoning_tokens": 0,
+  "authorizations": {}
+ },
+ "api_contract": {},
+ "tasks": [
+  {
+   "worker_kind": "backend",
+   "title": "Backend implementation",
+   "instructions": "Worker: backend\nProject: Habit Tracker\nRequest: Build a small habit tracker web app where users add habits and tick them off each day.\nRequest policy: {\"excluded_capabilities\": [], \"requested_capabilities\": []}\nCapability: react-fastapi\nProject specification: {\"acceptance_criteria\": [\"All declared d",
+   "task_id": "ff1f3e7b-ee70-4f3b-a360-2167aa1dda40",
+   "status": "pending",
+   "attempt": 0,
+   "max_attempts": 4,
+   "depends_on": [],
+   "capability_id": "react-fastapi",
+   "adapter_ids": [
+    "core",
+    "stack:react-fastapi"
+   ],
+   "retry_context": null,
+   "transport_attempts": 0,
+   "repair_rejections": 0
+  },
+  {
+   "worker_kind": "frontend",
+   "title": "Frontend implementation",
+   "instructions": "Worker: frontend\nProject: Habit Tracker\nRequest: Build a small habit tracker web app where users add habits and tick them off each day.\nRequest policy: {\"excluded_capabilities\": [], \"requested_capabilities\": []}\nCapability: react-fastapi\nProject specification: {\"acceptance_criteria\": [\"All declared ",
+   "task_id": "a084ced4-ab18-45a3-b8be-baa901ec80cb",
+   "status": "pending",
+   "attempt": 0,
+   "max_attempts": 4,
+   "depends_on": [],
+   "capability_id": "react-fastapi",
+   "adapter_ids": [
+    "core",
+    "stack:react-fastapi"
+   ],
+   "retry_context": null,
+   "transport_attempts": 0,
+   "repair_rejections": 0
+  }
+ ],
+ "worker_results": [],
+ "manifest_state": {},
+ "verified_manifest_state": {},
+ "verified_validation": {},
+ "manifest_generation": 0,
+ "manifest_transaction": {},
+ "guardrail_reports": [
+  {
+   "name": "acceptable_use",
+   "passed": true,
+   "findings": [
+    {
+     "name": "acceptable_use",
+     "passed": true,
+     "severity": "info",
+     "message": "No prohibited-use patterns detected.",
+     "metadata": {}
+    }
+   ]
+  },
+  {
+   "name": "input_token_limit",
+   "passed": true,
+   "findings": [
+    {
+     "name": "input_token_limit",
+     "passed": true,
+     "severity": "info",
+     "message": "Estimated input tokens 21 are within limit 25000.",
+     "metadata": {
+      "estimated_tokens": 21,
+      "max_tokens": 25000
+     }
+    }
+   ]
+  },
+  {
+   "name": "prompt_injection",
+   "passed": true,
+   "findings": [
+    {
+     "name": "prompt_injection",
+     "passed": true,
+     "severity": "info",
+     "message": "No prompt-injection patterns detected.",
+     "metadata": {}
+    }
+   ]
+  }
+ ],
+ "artifacts": [],
+ "release_status": "pending",
+ "risk_findings": [],
+ "quarantine_preview_consumed": false,
+ "artifact_errors": [],
+ "validation_results": [],
+ "repair_tickets": [],
+ "active_repair_ticket_ids": {},
+ "failure_fingerprints": {},
+ "feedback_requests": [
+  {
+   "gate": "product_contract",
+   "worker_kind": null,
+   "task_id": null,
+   "attempt": 0,
+   "title": "Approve the product contract",
+   "prompt": "Confirm the product scope, stack, experience direction, workers, and API contract before implementation begins.",
+   "summary": "Planning and visual direction are complete.",
+   "visual_type": "structured_json",
+   "visual_content": "{\n  \"project_id\": \"Habit Tracker\",\n  \"request\": \"Build a small habit tracker web app where users add habits and tick them off each day.\",\n  \"stack\": {\n    \"capability_id\": \"react-fastapi\",\n    \"application_type\": \"fullstack_web_application\",\n    \"frontend_framework\": \"React with Vite\",\n    \"backend_framework\": \"FastAPI\",\n    \"primary_languages\": [\n      \"TypeScript\",\n      \"Python\"\n    ],\n    \"runtime_versions\": {\n      \"node\": \"20\",\n      \"python\": \"3.11\"\n    },\n    \"package_managers\": {\n      \"javascript\": \"npm\",\n      \"python\": \"pip\"\n    },\n    \"ports\": {\n      \"frontend\": 5173,\n      \"backend\": 8000\n    },\n    \"adapter_ids\": [\n      \"core\",\n      \"stack:react-fastapi\"\n    ],\n    \"requested_features\": [],\n    \"excluded_features\": [],\n    \"acceptance_criteria\": [\n      \"All declared dependency installation commands succeed.\",\n      \"All generated tests pass.\",\n      \"The production build succeeds when the stack has a build step.\",\n      \"The application starts locally and its primary workflow succeeds.\",\n      \"Generated documentation references only files and commands that exist.\"\n    ],\n    \"explicitly_selected\": false,\n    \"confidence\": 0.72,\n    \"schema_version\": 1\n  },\n  \"design\": {\n    \"product_summary\": \"Build a small habit tracker web app where users add habits and tick them off each day.\",\n    \"experience_goal\": \"A polished, focused, responsive product experience.\",\n    \"visual_direction\": {\n      \"tone\": \"premium, minimal, content-led\",\n      \"theme\": \"adaptive da",
+   "checkpoint_id": "872c19b9-ee90-4724-8b21-399df92be896",
+   "status": "pending",
+   "response": null,
+   "metadata": {
+    "required": true,
+    "stage": "product_contract"
+   },
+   "created_at": "2026-09-26T04:13:45.752506+00:00",
+   "updated_at": "2026-09-26T04:13:45.752507+00:00"
+  }
+ ],
+ "active_feedback_request_id": "872c19b9-ee90-4724-8b21-399df92be896",
+ "evaluation": null,
+ "loop_count": 0,
+ "errors": [],
+ "warnings": [],
+ "created_at": "2026-09-26T04:13:45.706173+00:00",
+ "updated_at": "2026-09-26T04:13:45.753834+00:00"
+}
