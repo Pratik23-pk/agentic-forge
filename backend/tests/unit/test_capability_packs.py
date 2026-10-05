@@ -103,7 +103,9 @@ def test_fastapi_persistence_template_configures_postgresql_only_when_requested(
     assert "create_engine(" in persistent["backend/src/app/main.py"]
     assert "DATABASE_URL" in persistent["backend/.env.example"]
     assert "sqlalchemy==2.0.36" in persistent["backend/pyproject.toml"]
-    assert "backend/.env.example" not in standalone
+    assert "CORS_ORIGINS" in standalone["backend/.env.example"]
+    assert "DATABASE_URL" not in standalone["backend/.env.example"]
+    assert "sqlalchemy==2.0.36" not in standalone["backend/pyproject.toml"]
 
 
 def test_node_persistence_template_configures_postgresql_only_when_requested() -> None:
