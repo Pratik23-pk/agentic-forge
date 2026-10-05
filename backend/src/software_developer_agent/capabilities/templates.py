@@ -547,6 +547,11 @@ def _fastapi_files(project_prompt: str, project_id: str) -> dict[str, str]:
     if requires_persistence:
         files["backend/.env.example"] = (
             "DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/app\n"
+            "CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173\n"
+        )
+    else:
+        files["backend/.env.example"] = (
+            "CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173\n"
         )
     return files
 
@@ -558,6 +563,7 @@ def _fastapi_main(
     requires_persistence: bool,
 ) -> str:
     imports = [
+        "from os import getenv",
         "from fastapi import FastAPI, HTTPException",
         "from fastapi.middleware.cors import CORSMiddleware",
     ]
@@ -566,7 +572,6 @@ def _fastapi_main(
     if requires_persistence:
         imports.extend(
             [
-                "from os import getenv",
                 "from sqlalchemy import create_engine, text",
                 "from sqlalchemy.engine import Engine",
             ]
@@ -599,11 +604,19 @@ def _fastapi_main(
         *(configuration.rstrip().splitlines() if configuration else []),
         "",
         "",
+        "def cors_origins() -> list[str]:",
+        "    raw_origins = getenv(",
+        '        "CORS_ORIGINS",',
+        '        "http://localhost:5173,http://127.0.0.1:5173",',
+        "    )",
+        "    return [origin.strip() for origin in raw_origins.split(',') if origin.strip()]",
+        "",
+        "",
         "def create_app() -> FastAPI:",
         "    app = FastAPI(title=PROJECT_NAME)",
         "    app.add_middleware(",
         "        CORSMiddleware,",
-        '        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],',
+        "        allow_origins=cors_origins(),",
         "        allow_credentials=False,",
         '        allow_methods=["GET"],',
         '        allow_headers=["Content-Type"],',

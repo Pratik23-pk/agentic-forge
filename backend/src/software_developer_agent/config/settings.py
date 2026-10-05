@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -6,11 +7,44 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _find_project_root() -> Path:
+    """Resolve the repository root even when the package is imported from a venv."""
+
+    override = os.getenv("AGENTIC_FORGE_HOME") or os.getenv("SOFTWARE_DEVELOPER_AGENT_HOME")
+    if override:
+        return Path(override).expanduser().resolve()
+
+    candidates = [Path.cwd(), *Path(__file__).resolve().parents]
+    seen: set[Path] = set()
+    for start in candidates:
+        for candidate in (start, *start.parents):
+            resolved = candidate.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            if (
+                (candidate / ".env").exists()
+                and (candidate / "backend").is_dir()
+                and (candidate / "frontend").is_dir()
+            ):
+                return resolved
+            if (
+                (candidate / "backend" / "pyproject.toml").exists()
+                and (candidate / "frontend" / "package.json").exists()
+            ):
+                return resolved
+
+    return Path(__file__).resolve().parents[4]
+
+
+PROJECT_ROOT = _find_project_root()
+
+
 class Settings(BaseSettings):
     """Runtime configuration loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).resolve().parents[4] / ".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -113,15 +147,11 @@ class Settings(BaseSettings):
     explainer_budget_usd: float = Field(default=0.01, gt=0, le=0.01)
     explainer_per_prompt_budget_usd: float = Field(default=0.001, gt=0, le=0.001)
     max_human_checkpoints: int = Field(default=4, ge=0, le=8)
-    artifacts_dir: Path = Path(__file__).resolve().parents[4] / "artifacts"
-    generated_projects_dir: Path = Path(__file__).resolve().parents[4] / "generated-projects"
-    preview_cache_dir: Path = Path(__file__).resolve().parents[4] / ".agentic-forge" / "previews"
-    media_cache_dir: Path = (
-        Path(__file__).resolve().parents[4] / ".agentic-forge" / "media-cache"
-    )
-    upload_cache_dir: Path = (
-        Path(__file__).resolve().parents[4] / ".agentic-forge" / "upload-cache"
-    )
+    artifacts_dir: Path = PROJECT_ROOT / "artifacts"
+    generated_projects_dir: Path = PROJECT_ROOT / "generated-projects"
+    preview_cache_dir: Path = PROJECT_ROOT / ".agentic-forge" / "previews"
+    media_cache_dir: Path = PROJECT_ROOT / ".agentic-forge" / "media-cache"
+    upload_cache_dir: Path = PROJECT_ROOT / ".agentic-forge" / "upload-cache"
     preview_host: str = "127.0.0.1"
     preview_port_start: int = Field(default=4100, ge=1024, le=65_000)
     preview_port_end: int = Field(default=4199, ge=1024, le=65_535)

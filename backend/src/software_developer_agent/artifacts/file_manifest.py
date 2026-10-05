@@ -1253,6 +1253,7 @@ def _backend_main(project_prompt: str, project_id: str) -> str:
             f"""
         from __future__ import annotations
 
+        import os
         from uuid import uuid4
 
         from fastapi import FastAPI
@@ -1265,6 +1266,14 @@ def _backend_main(project_prompt: str, project_id: str) -> str:
         records: list[dict] = []
 
 
+        def cors_origins() -> list[str]:
+            raw_origins = os.getenv(
+                "CORS_ORIGINS",
+                "http://localhost:5173,http://127.0.0.1:5173",
+            )
+            return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+
         class RecordIn(BaseModel):
             kind: str = Field(default="item", min_length=1, max_length=80)
             title: str = Field(min_length=1, max_length=200)
@@ -1275,7 +1284,7 @@ def _backend_main(project_prompt: str, project_id: str) -> str:
         app = FastAPI(title=PROJECT_NAME, version="0.1.0")
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+            allow_origins=cors_origins(),
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],

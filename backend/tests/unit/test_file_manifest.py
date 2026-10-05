@@ -62,6 +62,26 @@ def test_fallback_worker_manifest_contains_real_files() -> None:
     assert any("npm run build" in command for command in manifest.validation_commands)
 
 
+def test_backend_fallback_consumes_cors_origins_environment() -> None:
+    task = JobTask(
+        worker_kind=WorkerKind.BACKEND,
+        title="Backend",
+        instructions="Build a local API",
+    )
+
+    manifest = extract_worker_file_manifest(
+        fallback_worker_manifest_json(task, "Build a local API", "demo"),
+        WorkerKind.BACKEND,
+    )
+    backend_main = next(
+        file.content for file in manifest.files if file.path == "backend/src/app/main.py"
+    )
+
+    assert "getenv(" in backend_main
+    assert "CORS_ORIGINS" in backend_main
+    assert "allow_origins=cors_origins()" in backend_main
+
+
 def test_worker_manifest_prompt_does_not_default_to_sqlite() -> None:
     task = JobTask(
         worker_kind=WorkerKind.BACKEND,

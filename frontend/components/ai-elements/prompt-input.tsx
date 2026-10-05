@@ -1048,7 +1048,7 @@ export const PromptInputTextarea = ({
           controller.textInput.setInput(e.currentTarget.value);
           onChange?.(e);
         },
-        value: controller.textInput.value,
+        value: props.value ?? controller.textInput.value,
       }
     : {
         onChange,

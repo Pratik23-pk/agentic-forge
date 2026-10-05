@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import atexit
 import os
+import re
 import shutil
 import signal
 import socket
@@ -21,6 +22,14 @@ from software_developer_agent.capabilities.models import ProjectSpec
 from software_developer_agent.capabilities.registry import resolve_project_spec
 from software_developer_agent.config.settings import Settings, get_settings
 from software_developer_agent.models.job_state import JobState, ReleaseStatus
+
+ENVIRONMENT_REFERENCE_PATTERNS = (
+    re.compile(r"os\.getenv\(\s*[\"']([A-Z][A-Z0-9_]*)[\"']"),
+    re.compile(r"os\.environ(?:\.get)?\(\s*[\"']([A-Z][A-Z0-9_]*)[\"']"),
+    re.compile(r"os\.environ\[\s*[\"']([A-Z][A-Z0-9_]*)[\"']\s*\]"),
+    re.compile(r"import\.meta\.env\.([A-Z][A-Z0-9_]*)"),
+    re.compile(r"process\.env\.([A-Z][A-Z0-9_]*)"),
+)
 
 
 @dataclass(slots=True)
@@ -833,7 +842,11 @@ class PreviewManager:
                     "/workspace/.next:rw,nosuid,nodev,exec,size=256m,uid=1000,gid=1000,mode=0770",
                 ]
             )
+        else:
+            docker.extend(["--workdir", "/tmp/runtime"])
         docker.extend(["-e", "PYTHONDONTWRITEBYTECODE=1"])
+        if not is_node and "PYTHONPATH" not in environment:
+            docker.extend(["-e", "PYTHONPATH=/workspace/src:/workspace"])
         for key, value in environment.items():
             docker.extend(["-e", f"{key}={value}"])
         docker.extend(
@@ -1066,22 +1079,13 @@ def _uv_executable() -> str:
 
 
 def _preview_backend_environment(backend: Path) -> dict[str, str]:
-    env_example = backend / ".env.example"
-    if not env_example.exists():
-        return {}
-    names = {
-        line.split("=", maxsplit=1)[0].strip()
-        for line in env_example.read_text(encoding="utf-8", errors="replace").splitlines()
-        if "=" in line
-        and line.split("=", maxsplit=1)[0].strip()
-        and not line.lstrip().startswith("#")
-    }
+    names = _preview_environment_names(backend)
     values: dict[str, str] = {}
     for name in names:
         upper = name.upper()
         if upper == "DATABASE_URL":
             values[name] = "sqlite+pysqlite:////tmp/agentic-forge-preview.db"
-        elif upper in {"UPLOAD_DIR", "MEDIA_DIR", "MEDIA_ROOT", "STORAGE_DIR"}:
+        elif upper in {"UPLOAD_DIR", "MEDIA_DIR", "MEDIA_ROOT", "STORAGE_DIR", "CACHE_DIR"}:
             values[name] = "/tmp/agentic-forge-media"
         elif upper.endswith(("_URL", "_ORIGIN")):
             values[name] = "http://127.0.0.1:9"
@@ -1109,6 +1113,36 @@ def _preview_backend_environment(backend: Path) -> dict[str, str]:
         else:
             values[name] = "preview"
     return values
+
+
+def _preview_environment_names(backend: Path) -> set[str]:
+    names: set[str] = set()
+    env_example = backend / ".env.example"
+    if env_example.exists():
+        names.update(
+            line.split("=", maxsplit=1)[0].strip()
+            for line in env_example.read_text(encoding="utf-8", errors="replace").splitlines()
+            if "=" in line
+            and line.split("=", maxsplit=1)[0].strip()
+            and not line.lstrip().startswith("#")
+        )
+    runtime_text = "\n".join(
+        path.read_text(encoding="utf-8", errors="replace")
+        for path in backend.rglob("*")
+        if path.is_file()
+        and path.stat().st_size <= 300_000
+        and path.suffix.lower() in {".py", ".js", ".ts", ".mjs", ".cjs"}
+        and "test" not in path.relative_to(backend).parts
+        and "tests" not in path.relative_to(backend).parts
+    )
+    for pattern in ENVIRONMENT_REFERENCE_PATTERNS:
+        names.update(pattern.findall(runtime_text))
+    if re.search(r"sqlite(?:\+pysqlite)?:///", runtime_text, re.IGNORECASE):
+        names.add("DATABASE_URL")
+    for storage_name in ("UPLOAD_DIR", "MEDIA_DIR", "MEDIA_ROOT", "STORAGE_DIR", "CACHE_DIR"):
+        if re.search(rf"\b{storage_name}\b", runtime_text):
+            names.add(storage_name)
+    return names
 
 
 def _http_is_ready(url: str, *, allow_not_found: bool = False) -> bool:

@@ -45,6 +45,22 @@ and downloadable software project while preserving human control over sensitive 
 
 ## Current Release Highlights
 
+### Latest Reliability Update
+
+- Resolves repository-root discovery from editable source and virtualenv imports, so the backend
+  reads the root `.env` and writes generated projects, artifacts, previews, media caches, and upload
+  caches in the intended repository folders.
+- Makes certified FastAPI templates and guaranteed fallback backends consume `CORS_ORIGINS` at
+  runtime instead of hardcoded Studio ports, which keeps Docker validation, dynamic previews, and
+  deployed origins aligned.
+- Hardens generated backend validation and preview startup for Docker-safe runtime paths such as
+  database files, uploads, caches, exports, logs, and media storage.
+- Stabilizes the Studio prompt composer after the frontend PR merge so typed prompts are not reset by
+  polling refreshes while a user is still editing.
+- Verified the complete workflow with a Hindi movie recommender prompt: product contract approval,
+  backend and frontend generation, targeted repair, Docker build/test/audit validation, evaluator
+  approval, release approval, ZIP creation, and live preview/browser smoke all passed.
+
 ### Automatic Generation Profiles
 
 The Studio presents three understandable build modes without exposing a raw maximum-spend field:

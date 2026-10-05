@@ -10,6 +10,7 @@ from software_developer_agent.models.job_state import JobRequest, JobState, Rele
 from software_developer_agent.sandbox.preview_manager import (
     PreviewManager,
     PreviewRecord,
+    _preview_backend_environment,
     _preview_failure_marker,
 )
 
@@ -192,6 +193,45 @@ def test_docker_preview_command_uses_internal_network_and_hardening(tmp_path: Pa
     ]
     assert "no-new-privileges" in command
     assert "-v" not in command
+
+
+def test_python_docker_preview_runs_from_writable_runtime_directory(tmp_path: Path) -> None:
+    manager = PreviewManager(
+        Settings(
+            app_env="test",
+            preview_cache_dir=tmp_path,
+            preview_sandbox_mode="docker",
+            preview_docker_network="test-quarantine",
+        )
+    )
+    service = manager._service("job-12345678", "backend", "backend", 4100, ["python"])
+
+    command = manager._docker_command(
+        "job-12345678",
+        service,
+        ["python", "-m", "uvicorn", "app.main:app", "--port", "4100"],
+        {"PORT": "4100"},
+        "test-image",
+        is_node=False,
+    )
+
+    assert command[command.index("--workdir") + 1] == "/tmp/runtime"
+    assert "PYTHONPATH=/workspace/src:/workspace" in command
+
+
+def test_preview_backend_environment_infers_runtime_storage_defaults(tmp_path: Path) -> None:
+    backend = tmp_path / "backend"
+    app = backend / "src/app"
+    app.mkdir(parents=True)
+    (app / "database.py").write_text(
+        "from sqlalchemy import create_engine\n"
+        "engine = create_engine('sqlite:///./local.db')\n",
+        encoding="utf-8",
+    )
+
+    environment = _preview_backend_environment(backend)
+
+    assert environment["DATABASE_URL"] == "sqlite+pysqlite:////tmp/agentic-forge-preview.db"
 
 
 def test_preview_proxy_builds_config_image_without_host_bind(tmp_path: Path, monkeypatch) -> None:

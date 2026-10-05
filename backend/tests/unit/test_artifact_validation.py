@@ -117,7 +117,7 @@ def test_synthetic_smoke_environment_uses_non_secret_validation_values(tmp_path)
 
     environment = _synthetic_smoke_environment(backend)
 
-    assert environment["DATABASE_URL"].startswith("postgresql+psycopg://validator:")
+    assert environment["DATABASE_URL"] == "sqlite+pysqlite:////tmp/agentic-forge-validation.db"
     assert len(environment["JWT_SECRET"]) >= 32
     assert environment["CORS_ORIGIN"] == "http://127.0.0.1:9"
     assert environment["JWT_EXPIRES_MINUTES"] == "1"
@@ -178,6 +178,34 @@ def test_backend_manifest_requires_itsdangerous_for_session_middleware() -> None
     )
 
     assert any("SessionMiddleware requires" in finding for finding in findings)
+
+
+def test_backend_runtime_readiness_rejects_hardcoded_relative_sqlite(tmp_path) -> None:
+    (tmp_path / "backend/src/app").mkdir(parents=True)
+    (tmp_path / "backend/pyproject.toml").write_text(
+        _valid_backend_pyproject("fastapi==0.115.12", "sqlalchemy==2.0.40"),
+        encoding="utf-8",
+    )
+    (tmp_path / "backend/uv.lock").write_text("version = 1\n", encoding="utf-8")
+    (tmp_path / "backend/.python-version").write_text("3.11\n", encoding="utf-8")
+    (tmp_path / "backend/src/app/main.py").write_text(
+        "from sqlalchemy import create_engine\n"
+        "engine = create_engine('sqlite:///./app.db')\n"
+        "app = object()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "backend/tests").mkdir()
+    (tmp_path / "backend/tests/test_api.py").write_text("def test_ok(): assert True\n")
+    (tmp_path / "README.md").write_text("# Demo\n", encoding="utf-8")
+    job = JobState(request=JobRequest(prompt="Build a FastAPI app with local persistence"))
+
+    report = ProjectValidator(
+        Settings(app_env="development", enable_artifact_validation=False)
+    ).validate(tmp_path, job)
+
+    assert not report.passed
+    assert report.retry_targets == [WorkerKind.BACKEND]
+    assert "hardcoded relative SQLite database path" in (report.failure_reason or "")
 
 
 def test_backend_manifest_rejects_bcrypt_seeds_with_argon2_only_runtime() -> None:

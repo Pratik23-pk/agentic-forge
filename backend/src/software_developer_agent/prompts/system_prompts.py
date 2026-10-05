@@ -249,6 +249,10 @@ Module import and test discovery must not require live credentials, network acce
 database. Read configuration without connecting at import time, validate it at the application boundary,
 and keep the health route independent from external providers. For FastAPI 204 routes, return an empty
 Response and do not declare a response model or body that violates the framework status-code contract.
+Any runtime persistence, cache, upload, export, media, or log path must be environment-driven and safe
+inside a read-only, non-root Docker preview. Do not hardcode relative SQLite URLs, upload folders,
+cache folders, or generated files under the source tree. Use documented settings such as DATABASE_URL,
+UPLOAD_DIR, MEDIA_DIR, STORAGE_DIR, or CACHE_DIR with preview-safe defaults under /tmp.
 All generated tests must be hermetic: create a disposable test database or override the database
 dependency before issuing requests, configure required non-secret settings explicitly, and never make
 public, authentication, authorization, or business-rule tests depend on a live Supabase connection.

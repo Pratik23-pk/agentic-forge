@@ -781,9 +781,14 @@ class ProjectValidator:
             findings.extend(backend_connectivity_findings)
             if backend_connectivity_findings:
                 retry_targets.add(WorkerKind.BACKEND)
+            backend_runtime_findings = _backend_runtime_readiness_findings(text_files)
+            findings.extend(backend_runtime_findings)
+            if backend_runtime_findings:
+                retry_targets.add(WorkerKind.BACKEND)
             checks.append("backend_dependency_manifest")
             checks.append("backend_test_presence")
             checks.append("backend_dependency_pinning")
+            checks.append("backend_runtime_readiness")
 
         if any(path.startswith("frontend/") for path in files):
             if "frontend/package.json" not in files:
@@ -1760,6 +1765,42 @@ def _backend_runtime_connectivity_findings(
     return []
 
 
+def _backend_runtime_readiness_findings(text_files: dict[str, str]) -> list[str]:
+    backend_runtime = "\n".join(
+        content
+        for path, content in text_files.items()
+        if path.startswith("backend/")
+        and _is_runtime_security_path(path)
+        and PurePath(path).suffix.lower() in {".py", ".js", ".ts", ".mjs", ".cjs"}
+    )
+    if not backend_runtime:
+        return []
+
+    findings: list[str] = []
+    hardcoded_relative_sqlite = re.search(
+        r"sqlite(?:\+pysqlite)?:///(?!/)(?:\./)?[A-Za-z0-9_.-][^\"'\s)]*",
+        backend_runtime,
+        re.IGNORECASE,
+    )
+    if hardcoded_relative_sqlite and "DATABASE_URL" not in backend_runtime:
+        findings.append(
+            "Backend runtime uses a hardcoded relative SQLite database path. Runtime storage must "
+            "be environment-driven through DATABASE_URL with a Docker-preview-safe default under /tmp."
+        )
+
+    relative_storage = re.search(
+        r"\b(?:UPLOAD_DIR|MEDIA_DIR|MEDIA_ROOT|STORAGE_DIR|CACHE_DIR)\s*=\s*"
+        r"['\"](?!/|\{|\$|https?://)[A-Za-z0-9_.-][^'\"]*['\"]",
+        backend_runtime,
+    )
+    if relative_storage:
+        findings.append(
+            "Backend runtime declares a relative writable storage path. Runtime writable paths must "
+            "be environment-driven and default to /tmp for Docker preview."
+        )
+    return findings
+
+
 def _node_manifest_findings(
     component: str,
     text_files: dict[str, str],
@@ -2134,23 +2175,14 @@ def _validation_environment(
 
 
 def _synthetic_smoke_environment(component: Path) -> dict[str, str]:
-    env_example = component / ".env.example"
-    if not env_example.exists():
-        return {}
-    names = {
-        line.split("=", maxsplit=1)[0].strip()
-        for line in env_example.read_text(encoding="utf-8", errors="replace").splitlines()
-        if "=" in line
-        and line.split("=", maxsplit=1)[0].strip()
-        and not line.lstrip().startswith("#")
-    }
+    names = _runtime_environment_names(component)
     values: dict[str, str] = {}
     for name in names:
         upper = name.upper()
         if upper == "DATABASE_URL":
-            values[name] = (
-                "postgresql+psycopg://validator:validator@127.0.0.1:5432/validator"
-            )
+            values[name] = "sqlite+pysqlite:////tmp/agentic-forge-validation.db"
+        elif upper in {"UPLOAD_DIR", "MEDIA_DIR", "MEDIA_ROOT", "STORAGE_DIR", "CACHE_DIR"}:
+            values[name] = "/tmp/agentic-forge-runtime"
         elif upper.endswith(("_URL", "_ORIGIN")):
             values[name] = "http://127.0.0.1:9"
         elif any(marker in upper for marker in ("KEY", "PASSWORD", "SECRET", "TOKEN")):
@@ -2179,6 +2211,36 @@ def _synthetic_smoke_environment(component: Path) -> dict[str, str]:
         else:
             values[name] = "validation"
     return values
+
+
+def _runtime_environment_names(component: Path) -> set[str]:
+    names: set[str] = set()
+    env_example = component / ".env.example"
+    if env_example.exists():
+        names.update(
+            line.split("=", maxsplit=1)[0].strip()
+            for line in env_example.read_text(encoding="utf-8", errors="replace").splitlines()
+            if "=" in line
+            and line.split("=", maxsplit=1)[0].strip()
+            and not line.lstrip().startswith("#")
+        )
+    runtime_text = "\n".join(
+        path.read_text(encoding="utf-8", errors="replace")
+        for path in component.rglob("*")
+        if path.is_file()
+        and path.stat().st_size <= 300_000
+        and path.suffix.lower() in {".py", ".js", ".ts", ".mjs", ".cjs"}
+        and "test" not in path.relative_to(component).parts
+        and "tests" not in path.relative_to(component).parts
+    )
+    for pattern in ENVIRONMENT_REFERENCE_PATTERNS:
+        names.update(pattern.findall(runtime_text))
+    if re.search(r"sqlite(?:\+pysqlite)?:///", runtime_text, re.IGNORECASE):
+        names.add("DATABASE_URL")
+    for storage_name in ("UPLOAD_DIR", "MEDIA_DIR", "MEDIA_ROOT", "STORAGE_DIR", "CACHE_DIR"):
+        if re.search(rf"\b{storage_name}\b", runtime_text):
+            names.add(storage_name)
+    return names
 
 
 def _backend_health_script(module: str) -> str:
